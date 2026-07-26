@@ -163,16 +163,24 @@ const server = http.createServer((req, res) => {
       const realPose = poseLodger;
       poseLodger = function (b, t, st, sp, ln, hy, hp) { poses[st] = (poses[st] | 0) + 1; return realPose(b, t, st, sp, ln, hy, hp); };
       // quiet player, far away: he should patrol, listen and search
-      P.x = 2.5; P.z = 2.5; V.x = 26.5; V.z = 26.5; P.hidden = null;
+      const qf = [];
+      for (let gy = 1; gy < MH - 1; gy++) for (let gx = 1; gx < MW - 1; gx++)
+        if (!solid(gx, gy) && !doorAt(gx, gy)) qf.push({ x: gx, y: gy });
+      P.x = qf[0].x + 0.5; P.z = qf[0].y + 0.5;
+      const qFar = qf[qf.length - 1];
+      V.x = qFar.x + 0.5; V.z = qFar.y + 0.5; P.hidden = null;
       THROWN.length = 0; LURES.length = 0; WARDS.length = 0; BLOODTRAIL.length = 0;
       resetMind(); NOISE.level = 0; NOISE.mic = 0; NOISE.move = 0; NOISE.step = 0;
+      let quietTravel = 0, qpx = V.x, qpz = V.z;
       for (let i = 0; i < 3000; i++) {
         P.alive = true;
         try { updateNoise(0.05); updateVillain(0.05); } catch (e) { errs.push('AI tick: ' + e.message + ' @ ' + String(e.stack).split('\n')[1]); break; }
         seen[V.state] = (seen[V.state] | 0) + 1;
-        if (Math.hypot(V.x - P.x, V.z - P.z) < 1.2) { V.x = 26.5; V.z = 26.5; resetMind(); }
+        quietTravel += Math.hypot(V.x - qpx, V.z - qpz); qpx = V.x; qpz = V.z;
+        if (Math.hypot(V.x - P.x, V.z - P.z) < 1.2) { V.x = qFar.x + 0.5; V.z = qFar.y + 0.5; resetMind(); qpx = V.x; qpz = V.z; }
       }
-      log.push('quiet 150s states: ' + JSON.stringify(seen));
+      log.push('quiet 150s states: ' + JSON.stringify(seen) + '  travelled ' + quietTravel.toFixed(0) + 'm');
+      if (quietTravel < 60) errs.push('he barely moves on a quiet night: ' + quietTravel.toFixed(0) + 'm in 150s');
       // now make a racket and check he commits, and that he actually arrives
       const seen2 = {};
       resetMind();

@@ -7886,13 +7886,27 @@ function updateVillain(dt){
       beginSweep(roomAtCell(goal.x, goal.y));
       setVState('search');
     }
-  } else if (V.state === 'check' && V.checkHide){
-    goal = { x: Math.floor(V.checkHide.x), y: Math.floor(V.checkHide.z) };
-    arriveR = 1.0;
-    if (Math.hypot(V.checkHide.x - V.x, V.checkHide.z - V.z) < 1.15){
-      openHidingPlace(V.checkHide);
-      V.checkHide = null;
+  } else if (V.state === 'check'){
+    /* A wardrobe can end up somewhere he cannot path to - jammed behind the
+       furniture that was dressed in around it. 'check' is the one state the
+       chain above will not pull him out of, so it has to be able to give up
+       on its own or he stands in the middle of the room for the rest of the
+       night looking at a wardrobe he will never reach. */
+    if (!V.checkHide){
       setVState('search');
+    } else {
+      goal = { x: Math.floor(V.checkHide.x), y: Math.floor(V.checkHide.z) };
+      arriveR = 1.0;
+      if (Math.hypot(V.checkHide.x - V.x, V.checkHide.z - V.z) < 1.15){
+        openHidingPlace(V.checkHide);
+        V.checkHide = null;
+        setVState('search');
+      } else if (V.stateT > 7){
+        V.checkHide.__checked = M.clock;      // he could not get to it; leave it
+        V.checkHide = null;
+        M.frustration = clamp01(M.frustration + 0.1);
+        setVState('search');
+      }
     }
   } else if (V.state === 'search'){
     /* He works the room over: the hiding places first, because he knows
@@ -7910,6 +7924,11 @@ function updateVillain(dt){
       const c = M.sweepCells[0];
       goal = c;
       if (Math.hypot(c.x + 0.5 - V.x, c.y + 0.5 - V.z) < 0.85) M.sweepCells.shift();
+      // a cell he cannot get to is one he gives up on rather than stares at
+      else if (V.speed < 0.05){
+        M.cellT = (M.cellT || 0) + dt;
+        if (M.cellT > 1.4){ M.cellT = 0; M.sweepCells.shift(); }
+      } else M.cellT = 0;
     } else {
       if (M.sweep) M.checked[M.sweep.id] = M.clock;
       M.sweep = null;
@@ -7917,6 +7936,15 @@ function updateVillain(dt){
       setVState('patrol');
     }
   } else {                                  // patrol
+    /* A room centre can be a cell he cannot actually stand on - blocked by
+       the furniture that was dressed into it, or walled off behind a door
+       the level carved differently. He would then walk at it forever,
+       never "arrive", and never pick anything else: one search at the start
+       of the night and then two and a half minutes of standing about. If he
+       has not made ground in a while, throw the goal away. */
+    if (M.goal && V.speed < 0.05) M.stuckT = (M.stuckT || 0) + dt;
+    else M.stuckT = 0;
+    if (M.stuckT > 1.6){ M.goal = null; M.stuckT = 0; M.frustration = clamp01(M.frustration + 0.08); }
     if (!M.goal || Math.hypot(M.goal.x + 0.5 - V.x, M.goal.y + 0.5 - V.z) < 0.8){
       const r = pickSweepRoom();
       if (r){
@@ -7924,7 +7952,7 @@ function updateVillain(dt){
         // arriving somewhere he has not been in a while, he turns it over
         if (M.clock - (M.checked[r.id] === undefined ? -300 : M.checked[r.id]) > 55){
           beginSweep(r);
-          if (rng() < 0.55) setVState('search');
+          if (rng() < 0.82) setVState('search');
         }
       }
     }
@@ -7952,6 +7980,23 @@ function updateVillain(dt){
     const grip = clamp01((M.watched - 0.6) / 1.8);
     spd *= 1 - grip * 0.82;
     if (M.watched > 1.6 && V.stateT > 0.9 && rng() < dt * 1.4) SFX.wardHiss();
+  }
+
+  /* If he is ever standing in a solid cell - the level rebuilt around him, a
+     cutscene put him somewhere odd, a door closed on the square he was in -
+     BFS cannot even start, so every goal returns null and he stands there for
+     the rest of the night. Walk him out to the nearest floor. */
+  if (solid(Math.floor(V.x), Math.floor(V.z))){
+    let out = null, bd = 1e9;
+    for (let r = 1; r <= 4 && !out; r++){
+      for (let oy = -r; oy <= r; oy++) for (let ox = -r; ox <= r; ox++){
+        const cx = Math.floor(V.x) + ox, cy = Math.floor(V.z) + oy;
+        if (solid(cx, cy)) continue;
+        const d = ox*ox + oy*oy;
+        if (d < bd){ bd = d; out = { x: cx, y: cy }; }
+      }
+    }
+    if (out){ V.x = out.x + 0.5; V.z = out.y + 0.5; }
   }
 
   let step = null;
@@ -8089,10 +8134,10 @@ function updateVillain(dt){
 function beginSweep(r){
   const M = V.mind;
   M.sweep = r || null;
-  M.sweepCells = r ? sweepCellsOf(r).slice(0, 14) : [];
+  M.sweepCells = r ? sweepCellsOf(r).slice(0, 22) : [];
   // decided once per sweep, and the angrier and more frustrated he is the
   // more likely he is to go through the furniture rather than the floor
-  M.sweepHides = rng() < 0.42 + V.rage * 0.34 + M.frustration * 0.24;
+  M.sweepHides = rng() < 0.58 + V.rage * 0.30 + M.frustration * 0.22;
 }
 
 /* he opens the wardrobe, or he gets down and looks under the bed */
