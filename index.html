@@ -7092,6 +7092,7 @@ function startGame(){
   document.body.classList.remove('hidden-in');
   { const hm = el('hideMask'); if (hm) hm.className = ''; }
   P.startTime = performance.now();
+  P.beat = 0; P.beatPhase = 0; P.wound = 0; P.breathFog = 0; P.fadeOut = 0;
 
   V.x = spawn.villain.x; V.z = spawn.villain.y;
   V.state = 'walk'; V.stun = 0; V.lastSeen = null; V.active = true; V.anim = 0; V.busy = 0;
@@ -7221,7 +7222,24 @@ function updatePlayer(dt){
   // heartbeat
   P.hbT = (P.hbT || 0) + dt;
   const hbPeriod = lerp(1.25, 0.42, P.fear);
-  if (P.fear > 0.12 && P.hbT > hbPeriod){ P.hbT = 0; if (!(P.laudT > 0)) SFX.heart(P.fear > 0.6); }
+  if (P.fear > 0.12 && P.hbT > hbPeriod){
+    P.hbT = 0;
+    if (!(P.laudT > 0)) SFX.heart(P.fear > 0.6);
+    P.beatPhase = 1;                       // and the lens squeezes with it
+  }
+
+  /* ---- what the frame shows about the state of you --------------------
+     The post chain has had the hooks for this since the renderer went in;
+     these are the four things that drive them. ---- */
+  // the pulse: a hard thump that falls away, scaled by how frightened you are
+  P.beatPhase = Math.max(0, (P.beatPhase || 0) - dt * 5.2);
+  P.beat = P.beatPhase * P.beatPhase * clamp01(P.fear * 1.15) * (P.laudT > 0 ? 0.25 : 1);
+  // blood across the glass: what he has already taken out of you
+  const woundWant = clamp01((P.bleed || 0) * 0.85 + (P.trapHurt > 0 ? 0.35 : 0));
+  P.wound += (woundWant - P.wound) * Math.min(1, dt * 1.6);
+  // your own breath, when you are crouched and holding still in a cold house
+  const fogWant = (P.crouch > 0.5 && P.moving < 0.2 && !P.hidden) ? 0.55 + P.fear * 0.45 : 0;
+  P.breathFog += (fogWant - P.breathFog) * Math.min(1, dt * 0.9);
 
   updateCombat(dt);
   scanNear();
@@ -9214,6 +9232,8 @@ function updateHUD(){
 function die(){
   if (!P.alive) return;
   P.alive = false;
+  P.wound = 1;                 // the glass goes over all at once
+  P.beat = 0; P.breathFog = 0;
   SFX.sting();
   // 3D death cutscene first - he takes you on camera
   if (typeof cineDeath === 'function' && !QA){ cineDeath(deathScreen); return; }
@@ -9223,6 +9243,7 @@ function die(){
 
 function deathScreen(){
   V.active = false;
+  P.fadeOut = 0;
   const face = el('deathFace');
   face.style.backgroundImage = 'url(' + (ART && ART.face ? ART.face : '') + ')';
   setMode('dead');
@@ -10073,6 +10094,10 @@ function loop(now){
   }
   flashAmt = Math.max(0, flashAmt - dt*1.6);
   shakeAmt = Math.max(0, shakeAmt - dt*2.2);
+  /* the house closing over you. Not during the death cutscene - that one
+     runs its own fade, and blacking it out would hide the shot. */
+  const dying = !P.alive && MODE !== 'cine' && MODE !== 'menu';
+  P.fadeOut = clamp01((P.fadeOut || 0) + (dying ? dt * 0.85 : -dt * 3.0));
 
   if (gameStarted) renderFrame(dt);
 }
