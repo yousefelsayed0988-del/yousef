@@ -97,5 +97,46 @@ for (const mapId of maps) {
   check(board.some((r) => r.score > 0), 'somebody scored', `top ${board[0]?.score}`);
 }
 
+
+
+// ---------------------------------------------------------------- modes ----
+// Every mode has to reach a conclusion. Versus in particular has no hiders
+// once the hunt starts, so it needs its own win condition and its own idea of
+// who is a legal target.
+console.log('\nmode sweep (mansion)');
+for (const modeId of Object.keys(MODES)) {
+  const events = [];
+  let clock = 5000;
+  const match = createMatch({
+    mapId: 'mansion', modeId, rng: mulberry32(77), now: clock,
+    emit: (type, payload) => events.push({ type, payload }), log: () => {},
+  });
+  for (let i = 1; i <= 8; i++) match.addPlayer({ id: i, name: `B${i}`, bot: true, difficulty: 2 });
+  match.setOptions({ rounds: 1 });
+  match.startMatch();
+
+  const phases = new Set();
+  let ticks = 0;
+  let err = null;
+  const budget = Math.round((MODES[modeId].prep + MODES[modeId].hunt + 45) / TICK_DT);
+  try {
+    while (ticks++ < budget) {
+      clock += TICK_DT;
+      match.tick(TICK_DT, clock);
+      phases.add(match.state.phase);
+      if (match.state.phase === Phase.MATCH_END) break;
+    }
+  } catch (e) { err = e; }
+
+  const tags = events.filter((e) => e.payload?.e === 2).length;
+  const ended = phases.has(Phase.ROUND_END) || phases.has(Phase.MATCH_END);
+  check(!err, `${modeId}: runs without throwing`, err ? err.message : '');
+  check(phases.has(Phase.HUNT), `${modeId}: reaches the hunt`);
+  check(ended, `${modeId}: the round concludes`);
+  const nan = [...match.players.values()].some((p) => !Number.isFinite(p.pos.x));
+  check(!nan, `${modeId}: no NaN positions`);
+  console.log(`  info  ${modeId}: ${ticks} ticks, ${tags} tags, winner=${match.state.winner}`);
+}
+
 console.log(`\n${failures ? `${failures} check(s) failed.` : 'All checks passed.'}`);
 process.exit(failures ? 1 : 0);

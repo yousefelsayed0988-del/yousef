@@ -233,14 +233,18 @@ export function build() {
     }
     m.box(x, 0.4, z, 6.0, 0.7, 0.7, mid, { yaw, solid: false, jitter: 0.12 });
   };
-  diorama(-24.5, -12, 90, TEAL, EMERALD);
-  diorama(-24.5, 0, 90, '#3f5f8c', MARBLE_DK);
-  diorama(-24.5, 12, 90, RUST, '#7a5a2e');
-  diorama(24.5, -14, -90, EMERALD, '#4a6b2e');
+  // Yaw sets which way the cut-outs step forward off the backboard, so a wall
+  // diorama has to face into the room: -90 on the west wall, +90 on the east.
+  diorama(-24.5, -12, -90, TEAL, EMERALD);
+  diorama(-24.5, 0, -90, '#3f5f8c', MARBLE_DK);
+  diorama(-24.5, 12, -90, RUST, '#7a5a2e');
+  diorama(24.5, -14, 90, EMERALD, '#4a6b2e');
   diorama(0, -20.5, 0, '#2f4f6f', TEAL);
-  m.spot(-23.4, 0, -12, { stance: 'crouch', quality: 0.76, hint: 'Inside the tundra diorama' });
-  m.spot(-23.4, 0, 12, { stance: 'crouch', quality: 0.74, hint: 'Inside the desert diorama' });
-  m.spot(23.4, 0, -14, { stance: 'crouch', quality: 0.76, hint: 'Inside the forest diorama' });
+  // Standing still against three and a half metres of painted backboard is the
+  // one place on this map where a hider is better off upright than folded up.
+  m.spot(-23.4, 0, -12, { stance: 'stand', quality: 0.76, hint: 'Standing in the tundra diorama' });
+  m.spot(-23.4, 0, 12, { stance: 'stand', quality: 0.74, hint: 'Standing in the desert diorama' });
+  m.spot(23.4, 0, -14, { stance: 'stand', quality: 0.76, hint: 'Standing in the forest diorama' });
 
   // ---------------------------------------------------------- info plinths --
   const infoPlinth = (x, z, yaw, c) => {
@@ -260,8 +264,10 @@ export function build() {
   m.box(19.4, 1.05, 8.2, 8.2, 0.1, 1.0, SLATE, { solid: false });
   m.box(22.6, 1.05, 8.2, 0.6, 0.4, 0.5, SLATE, { solid: false });
   m.spot(19.4, 0, 9.2, { stance: 'crouch', quality: 0.82, hint: 'Behind the gift-shop counter' });
+  // Three levels, not four: at four the 0.55 pitch leaves a 0.48 opening and a
+  // prone chameleon is 0.5 tall, so the shelf's own hiding spot did not fit.
   for (let i = 0; i < 4; i++) {
-    m.shelf(14.6, 11 + i * 2.6, 2.4, 2.2, 0.6, WOOD, { yaw: -90, levels: 4, spot: i !== 1 });
+    m.shelf(14.6, 11 + i * 2.6, 2.4, 2.2, 0.6, WOOD, { yaw: -90, levels: 3, spot: i !== 1 });
   }
   m.shelf(21, 19.4, 6.0, 2.4, 0.6, WOOD, { yaw: 180, levels: 4, spot: false });
   m.spot(21, 0, 19.4, { stance: 'prone', quality: 0.8, hint: 'On the bottom of the plush shelf' });
@@ -279,6 +285,7 @@ export function build() {
   }
   m.crateStack(23.4, 12.4, WOOD, 3, 1.0, { spot: false });
   m.spot(23.2, 0, 14.4, { stance: 'crouch', quality: 0.78, hint: 'Behind the stockroom crates' });
+  m.spot(23.2, 0, 17.6, { stance: 'stand', quality: 0.72, hint: 'Upright in the stockroom corner' });
 
   // ------------------------------------------------ fossil wall and benches --
   for (let i = 0; i < 4; i++) {

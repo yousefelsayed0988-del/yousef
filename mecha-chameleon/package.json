@@ -9,7 +9,9 @@
     "start": "node server/index.js",
     "dev": "node server/index.js --verbose",
     "validate": "node tools/validate-maps.js",
-    "test": "node tools/validate-maps.js && node tools/test-sim.js"
+    "test": "node tools/validate-maps.js && node tools/test-anticheat.js && node tools/test-sim.js",
+    "test:e2e": "node tools/e2e.js",
+    "shots": "node tools/e2e.js --shots && node tools/model-shot.js"
   },
   "engines": {
     "node": ">=18"

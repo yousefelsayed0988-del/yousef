@@ -384,7 +384,8 @@ export function build() {
   m.spawnSeeker(23.1, 1.7, 2.32);
   m.spawnSeeker(23.1, -1.7, 2.32);
   m.spawnSeeker(21.9, 0, 2.03);
-  m.lobbySpawn(23.5, 0, 2.32);
+  // x = 23.5 straddles two treads; 23.1 sits square on the 2.32 one.
+  m.lobbySpawn(23.1, 0, 2.32);
 
   m.palette([SAND, SAND_DK, STONE, STONE_DK, ROCK, OCHRE, GOLD, GOLD_DK, LAPIS, LAPIS_LT, TURQ, RED, IVORY, BLACK]);
   return m.finish();

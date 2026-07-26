@@ -100,12 +100,14 @@ export function build() {
   m.spot(-13.7, 0, -14.6, { stance: 'crouch', quality: 0.72, hint: 'Between the wall and the north bank' });
 
   // ---------------------------------------------------------------- tables --
+  // Bed at 0.58 rather than 0.50: the rail top stays where a pool table's
+  // should be, but the crawl space underneath now clears a 0.5 m prone body.
   const poolTable = (x, z, yaw) => {
-    m.box(x, 0.5, z, 2.8, 0.28, 1.6, '#2f6b3f', { yaw, tag: 'felt', rough: 0.95 });
-    m.box(x, 0.5, z, 3.0, 0.36, 1.8, '#3a2418', { yaw, tag: 'rail' });
+    m.box(x, 0.58, z, 2.8, 0.20, 1.6, '#2f6b3f', { yaw, tag: 'felt', rough: 0.95 });
+    m.box(x, 0.58, z, 3.0, 0.28, 1.8, '#3a2418', { yaw, tag: 'rail' });
     for (const sx of [-1, 1]) {
       for (const sz of [-1, 1]) {
-        m.box(x + sx * 1.2, 0, z + sz * 0.6, 0.22, 0.5, 0.22, '#3a2418', { yaw });
+        m.box(x + sx * 1.2, 0, z + sz * 0.6, 0.22, 0.58, 0.22, '#3a2418', { yaw });
       }
     }
     for (let i = 0; i < 8; i++) {
@@ -198,7 +200,8 @@ export function build() {
       m.sphere(13.2 + b * 0.5, 0.68, z + (b - 1) * 0.3, 0.11, '#d8cfa8', { solid: false });
     }
   }
-  m.spot(12.4, 0, -11.5, { stance: 'prone', quality: 0.76, hint: 'Flat at the foot of the skee-ball lanes' });
+  // In front of the lane lip, not on it - the lane deck is 0.5 high.
+  m.spot(11.9, 0, -11.5, { stance: 'prone', quality: 0.76, hint: 'Flat at the foot of the skee-ball lanes' });
 
   // -------------------------------------------------------------- dance pad --
   m.box(-15.0, 0.32, -6.4, 2.8, 0.14, 2.8, BODY2, { tag: 'pad' });
@@ -212,7 +215,8 @@ export function build() {
   m.box(-15.0, 1.1, -8.0, 2.4, 1.2, 0.1, '#1a4a8c', { solid: false, emis: 2.2, tag: 'screen' });
   m.box(-15.0, 2.6, -8.4, 3.6, 0.4, 1.0, LIME, { solid: false, emis: 2.2 });
   for (const s of [-1, 1]) m.cyl(-15.0 + s * 1.9, 0, -7.4, 0.16, 2.4, m.pick([MAGENTA, CYAN]), { solid: false, emis: 1.3 });
-  m.spot(-15.0, 0, -7.4, { stance: 'prone', quality: 0.7, hint: 'Behind the dance machine rig' });
+  // Off the step pad itself, in the dark strip between the rig and the wall.
+  m.spot(-17.4, 0, -7.6, { stance: 'prone', quality: 0.7, hint: 'Behind the dance machine rig' });
 
   // ------------------------------------------------------- change and stools --
   for (const [cx, cz, cyaw] of [[-8.6, 14.6, 0], [8.0, -14.6, 180], [21.2, 8.0, 90]]) {

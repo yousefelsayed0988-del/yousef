@@ -128,7 +128,10 @@ export function createMatch(opts = {}) {
 
   function setPos(p, x, y, z) {
     p.pos.x = x; p.pos.z = z;
-    p.pos.y = Math.max(y, groundHeightAt(world, x, z, y + 4) + 0.02);
+    // Search only just above the declared height. Maps legitimately spawn
+    // players on a mezzanine or a ramp tread, and a wider search would snap
+    // them to whatever slab is overhead instead.
+    p.pos.y = Math.max(y, groundHeightAt(world, x, z, y + 1) + 0.02);
     p.vel.x = p.vel.y = p.vel.z = 0;
     unstick(world, p.pos, MOVE.radius, MOVE.height[Stance.STAND]);
   }
@@ -273,7 +276,12 @@ export function createMatch(opts = {}) {
     if (p.role !== Role.SEEKER || !p.alive) return;
     if (state.phase !== Phase.HUNT || !state.released) return;
 
-    const verdict = guard.checkShot(p, payload, clock, players);
+    // In versus everyone hunts everyone, so who counts as a target is the
+    // match's call, not the guard's.
+    const versus = mode().versus;
+    const verdict = guard.checkShot(p, payload, clock, players, {
+      canHit: (o) => (versus ? o.id !== p.id : o.role === Role.HIDER),
+    });
     if (!verdict.ok) {
       if (verdict.strike) guard.strike(p, verdict.reason, verdict.strike, clock);
       return;
@@ -295,7 +303,7 @@ export function createMatch(opts = {}) {
 
     if (verdict.hitId != null) {
       const victim = players.get(verdict.hitId);
-      if (victim && victim.alive && victim.role === Role.HIDER) tagPlayer(victim, p);
+      if (victim && victim.alive && (versus || victim.role === Role.HIDER)) tagPlayer(victim, p);
     } else if (verdict.point) {
       emitNear(verdict.point, 22, { e: EV.SPLASH, p: pos3(verdict.point), c: g.tracer });
     }
@@ -374,7 +382,7 @@ export function createMatch(opts = {}) {
       p: pos3(victim.pos), blend: r2(victim.blend),
     });
 
-    if (mode().infection) {
+    if (mode().infection && !mode().versus) {
       // Straight to the other side, standing where they were caught.
       victim.tagged = false;
       victim.role = Role.SEEKER;
@@ -634,9 +642,11 @@ export function createMatch(opts = {}) {
   // ------------------------------------------------------------ bot vision --
   function botContext(bot) {
     const targets = [];
+    // In versus there are no teams, so nobody is ever a friendly.
+    const versus = mode().versus && state.phase === Phase.HUNT;
     for (const other of players.values()) {
       if (other.id === bot.id || !other.alive) continue;
-      const sameTeam = other.role === bot.role;
+      const sameTeam = !versus && other.role === bot.role;
       if (sameTeam && bot.role === Role.SEEKER) {
         targets.push({ id: other.id, pos: other.pos, role: other.role, team: true });
         continue;

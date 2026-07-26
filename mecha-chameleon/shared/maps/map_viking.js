@@ -155,8 +155,10 @@ export function build() {
   }
   m.spot(-8, 0, -3.6, { stance: 'prone', quality: 0.8, hint: 'Flat under the north boards' });
   m.spot(4.4, 0, 3.6, { stance: 'prone', quality: 0.8, hint: 'Flat under the south boards' });
-  m.spot(-1.6, 0, 4.7, { stance: 'prone', quality: 0.66, hint: 'Along the outer bench' });
-  m.spot(-1.6, 0, -4.7, { stance: 'prone', quality: 0.66, hint: 'Along the far bench' });
+  // Behind the outer benches, not on them: the plank tops sit at 0.55 and a
+  // prone body is 0.5 tall, so the bench line only works as a screen.
+  m.spot(-1.6, 0, 5.3, { stance: 'prone', quality: 0.66, hint: 'Along the outer bench' });
+  m.spot(-1.6, 0, -5.3, { stance: 'prone', quality: 0.66, hint: 'Along the far bench' });
 
   // Feast clutter. Small, bright, and everywhere - a hider who paints pewter
   // and lies on a board is genuinely hard to pick out.
@@ -216,7 +218,9 @@ export function build() {
   chest(-18.3, -8.6, 12, 0, TIMBER_DK);
   chest(-18.3, 8.6, -12, 0, TIMBER);
   chest(-12.6, 11.4, 90, 0, TIMBER_DK);
-  m.spot(-19.2, DAIS_Y, -6.4, { stance: 'crouch', quality: 0.7, hint: 'Wedged behind the tribute chests' });
+  // z = -6.4 is off the end of the dais, so this one is at floor level looking
+  // up at the chests, not on the platform with them.
+  m.spot(-19.2, 0, -6.4, { stance: 'crouch', quality: 0.7, hint: 'Wedged behind the tribute chests' });
   m.spot(-18.3, 0, 9.6, { stance: 'crouch', quality: 0.72, hint: 'Beside the war chest' });
 
   // ---------------------------------------------------- side aisles: sleeping --
@@ -299,9 +303,11 @@ export function build() {
     [17.6, -8.4], [18.4, -9.4], [17.2, -9.8],
   ];
   for (const [bx, bz] of ale) m.barrel(bx, bz, m.pick(BARREL_C), { h: m.range(0.85, 1.05), r: m.range(0.33, 0.4) });
-  m.spot(-14.1, 0, -9.8, { stance: 'crouch', quality: 0.82, hint: 'Down among the ale barrels' });
-  m.spot(-14.1, 0, 10.0, { stance: 'crouch', quality: 0.8, hint: 'Behind the south ale stack' });
-  m.spot(17.9, 0, -8.9, { stance: 'crouch', quality: 0.76, hint: 'In the barrel store by the door' });
+  // These sit in the actual gaps between barrel bellies - a hand's width off
+  // and the physics parks the hider on top of the lids instead.
+  m.spot(-14.3, 0, -10.2, { stance: 'crouch', quality: 0.82, hint: 'Down among the ale barrels' });
+  m.spot(-14.3, 0, 10.3, { stance: 'crouch', quality: 0.8, hint: 'Behind the south ale stack' });
+  m.spot(17.6, 0, -9.2, { stance: 'crouch', quality: 0.76, hint: 'In the barrel store by the door' });
 
   // Firewood stacked against the north-west wall.
   for (let i = 0; i < 15; i++) {
@@ -315,18 +321,19 @@ export function build() {
       { solid: false, yaw: m.range(-8, 8), jitter: 0.14 });
   }
 
-  // Loom and a work corner in the south-west aisle.
-  m.box(-8.4, 0, 12.1, 0.24, 2.6, 0.24, OAK);
-  m.box(-6.2, 0, 12.1, 0.24, 2.6, 0.24, OAK);
-  m.box(-7.3, 2.4, 12.1, 2.4, 0.22, 0.26, OAK);
-  m.box(-7.3, 0.6, 12.25, 2.1, 1.7, 0.08, WOOL, { solid: false, jitter: 0.1, tag: 'cloth' });
+  // Loom and a work corner in the south-west aisle. Both have to clear the
+  // sleeping platform at x = -5.5, whose deck runs from x = -8.2 to -2.8.
+  m.box(-10.8, 0, 12.1, 0.24, 2.6, 0.24, OAK);
+  m.box(-8.6, 0, 12.1, 0.24, 2.6, 0.24, OAK);
+  m.box(-9.7, 2.4, 12.1, 2.4, 0.22, 0.26, OAK);
+  m.box(-9.7, 0.6, 12.25, 2.1, 1.7, 0.08, WOOL, { solid: false, jitter: 0.1, tag: 'cloth' });
   for (let i = 0; i < 7; i++) {
-    m.box(-8.2 + i * 0.27, 0.5, 12.16, 0.06, m.range(1.2, 1.8), 0.05, m.pick([RED, WOOL, GOLD]),
+    m.box(-10.6 + i * 0.27, 0.5, 12.16, 0.06, m.range(1.2, 1.8), 0.05, m.pick([RED, WOOL, GOLD]),
       { solid: false, jitter: 0.12 });
   }
-  m.table(-4.6, 10.6, 2.0, 0.9, 0.76, TIMBER_DK, { spot: false });
-  m.spot(-4.6, 0, 10.6, { stance: 'prone', quality: 0.7, hint: 'Under the work table' });
-  m.spot(-7.3, 0, 11.4, { stance: 'stand', quality: 0.74, hint: 'Behind the loom' });
+  m.table(-5.2, 9.4, 2.0, 0.9, 0.76, TIMBER_DK, { spot: false });
+  m.spot(-5.2, 0, 9.4, { stance: 'prone', quality: 0.7, hint: 'Under the work table' });
+  m.spot(-9.7, 0, 11.4, { stance: 'stand', quality: 0.74, hint: 'Behind the loom' });
 
   // Fur rugs scattered off the nave.
   for (const [rx, rz, rw, rd] of [[-3, -8.6, 3.4, 2.4], [4, -8.4, 3.0, 2.2], [-1, 8.6, 3.6, 2.4],
@@ -360,7 +367,8 @@ export function build() {
     m.box(19.1, 0.15 + m.irange(0, 2) * 0.76, m.range(-4.4, -2.0), 0.4, m.range(0.2, 0.4), m.range(0.2, 0.5),
       m.pick([WOOL, FUR, TIMBER, GOLD]), { solid: false, jitter: 0.14 });
   }
-  m.box(19.4, 0, 0, 0.5, 1.1, 4.2, STONE, { tag: 'trough', jitter: 0.06 });
+  // Shifted south so the trough stops running through the door shelf's back.
+  m.box(19.4, 0, 0.6, 0.5, 1.1, 4.2, STONE, { tag: 'trough', jitter: 0.06 });
   m.plant(14.6, 6.6, 1.1, TIMBER_DK, '#4f6b3c');
 
   // ---------------------------------------------------------------- lighting --

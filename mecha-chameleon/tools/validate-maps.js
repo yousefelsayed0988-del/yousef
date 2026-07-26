@@ -66,7 +66,7 @@ for (const mod of mods) {
   const allSpawns = [...def.spawns.hiders, ...def.spawns.seekers];
   let stuckSpawns = 0;
   for (const s of allSpawns) {
-    const ground = groundHeightAt(world, s[0], s[2], s[1] + 3);
+    const ground = groundHeightAt(world, s[0], s[2], s[1] + 1);
     const pos = { x: s[0], y: Math.max(s[1], ground) + 0.05, z: s[2] };
     if (capsuleOverlaps(world, pos.x, pos.y, pos.z, r, h)) {
       if (!unstick(world, pos, r, h)) stuckSpawns++;
@@ -79,10 +79,12 @@ for (const mod of mods) {
   let badSpots = 0, weakSpots = 0;
   for (const spot of def.hidingSpots) {
     const sh = MOVE.height[spot.stance === 'prone' ? 2 : spot.stance === 'stand' ? 0 : 1];
-    const ground = groundHeightAt(world, spot.p[0], spot.p[2], spot.p[1] + 3);
-    const pos = { x: spot.p[0], y: Math.max(spot.p[1], ground) + 0.03, z: spot.p[2] };
+    const pos = { x: spot.p[0], y: spot.p[1] + 0.03, z: spot.p[2] };
     if (capsuleOverlaps(world, pos.x, pos.y, pos.z, r * 0.9, sh)) {
-      if (!unstick(world, pos, r * 0.9, sh, 8)) badSpots++;
+      // Fall back to the surface under it before calling the spot broken.
+      pos.y = groundHeightAt(world, spot.p[0], spot.p[2], spot.p[1] + 1) + 0.03;
+      if (capsuleOverlaps(world, pos.x, pos.y, pos.z, r * 0.9, sh) &&
+        !unstick(world, pos, r * 0.9, sh, 8)) badSpots++;
     }
     const blend = computeBlend(world, pos, { body: [0.5, 0.5, 0.5] });
     if (!blend.samples.length) weakSpots++;

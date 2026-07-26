@@ -278,8 +278,9 @@ export function createBotBrain({ player, world, mapDef, difficulty = 1, rng = Ma
     state.fireCooldown = Math.max(0, state.fireCooldown - dt);
     state.jumpCooldown = Math.max(0, state.jumpCooldown - dt);
 
-    // Only hiders are worth shooting at, and only ones ctx actually gave us.
-    const visible = ctx.targets.filter((t) => t.role === Role.HIDER && !t.team);
+    // Anything ctx handed us that is not a teammate. Checking for the hider
+    // role instead would leave versus mode with nobody to shoot at.
+    const visible = ctx.targets.filter((t) => !t.team);
     let best = null, bestDist = Infinity;
     for (const t of visible) {
       const d = Math.hypot(t.pos.x - player.pos.x, t.pos.z - player.pos.z);

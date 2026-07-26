@@ -151,7 +151,11 @@ export function createGuard(world, opts = {}) {
     // as much simulated time as has actually elapsed, plus a burst for jitter.
     ac.budget = Math.min(cfg.maxInputBudget ?? 0.75, ac.budget + (now - ac.budgetAt));
     ac.budgetAt = now;
-    if (clamped.dt > ac.budget + 0.03) {
+    // The slack here has to be far smaller than a frame. At 30 ms it silently
+    // granted a free tick to anyone whose budget was merely close, which let a
+    // speedhack through at several times real time; jitter only needs epsilon,
+    // and a genuine stall is already covered by the 0.75 s burst.
+    if (clamped.dt > ac.budget + 0.002) {
       const granted = Math.max(0, ac.budget);
       if (granted < MOVE.minInputDt) {
         strike(player, 'time_warp', 0.75, now);
@@ -256,7 +260,13 @@ export function createGuard(world, opts = {}) {
   }
 
   // ---------------------------------------------------------------- shots --
-  function checkShot(player, shot, now, players) {
+  /**
+   * `opts.canHit(other)` decides who counts as a target - the match owns that
+   * rule, because in versus mode everybody is fair game and in the team modes
+   * only hiders are.
+   */
+  function checkShot(player, shot, now, players, opts2 = {}) {
+    const canHit = opts2.canHit || ((o) => o.role === Role.HIDER);
     const ac = acState(player, now);
     const gun = GUNS[player.gun] || GUNS.standard;
 
@@ -309,7 +319,7 @@ export function createGuard(world, opts = {}) {
     let hitT = maxT;
     for (const other of players.values()) {
       if (other.id === player.id || !other.alive) continue;
-      if (other.role !== Role.HIDER) continue;
+      if (!canHit(other)) continue;
       const h = MOVE.height[other.stance ?? 0];
       const t = rayCapsule(eye, dir, other.pos, h, MOVE.radius + 0.12, hitT);
       if (t != null && t < hitT) { hitT = t; hitId = other.id; }

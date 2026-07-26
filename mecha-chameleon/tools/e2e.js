@@ -226,11 +226,17 @@ async function main() {
         const mod = await import('/shared/maps/index.js');
         return mod.MAP_IDS;
       });
+      // Two live games rendering on software GL will starve the shot page.
+      await guest.close();
+      await host.close();
       const shotPage = await ctx.newPage();
+      shotPage.setDefaultTimeout(60000);
       watchPage(shotPage, 'preview', errors);
       for (const id of maps) {
-        await shotPage.goto(`${BASE}/?preview=${id}`, { waitUntil: 'domcontentloaded' });
-        await sleep(2200);
+        await shotPage.goto(`${BASE}/?preview=${id}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        await shotPage.waitForFunction(() => window.__mcDebug?.stats?.().instances > 0, null, { timeout: 30000 })
+          .catch(() => {});
+        await sleep(1600);
         await shotPage.screenshot({ path: join(SHOT_DIR, `map-${id}.png`) });
         console.log(`  shot  ${id}`);
       }
