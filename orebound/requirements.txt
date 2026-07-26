@@ -1,0 +1,4 @@
+# Only proxy.py needs these. The game itself has no dependencies at all.
+flask>=3.0
+flask-sock>=0.7
+simple-websocket>=1.0

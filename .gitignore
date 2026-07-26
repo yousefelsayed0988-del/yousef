@@ -16,3 +16,8 @@ _run_*.js
 # the shared multiplayer world, written at runtime by the host
 world-online.json
 world-online.json.tmp
+
+# logs proxy.py writes for the processes it supervises
+node-host.log
+tunnel.log
+__pycache__/

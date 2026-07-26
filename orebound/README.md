@@ -27,6 +27,35 @@ Or by hand, from inside the `orebound` folder:
 node serve.mjs --open           # or: python3 -m http.server 8080
 ```
 
+### The Flask front end (`proxy.py`)
+
+If you would rather host the game from Python — behind a tunnel, a reverse
+proxy, or a platform that wants a Python entry point — `proxy.py` is a Flask app
+that serves it on **port 3000**:
+
+```bash
+pip install -r requirements.txt
+python3 proxy.py                 # http://localhost:3000
+python3 proxy.py --tunnel        # ...and a public https link via Cloudflare
+```
+
+It does two things beyond `send_from_directory`. It pins `.js` and `.mjs` to
+`text/javascript`, because a module served under the wrong MIME type is refused
+by the browser and the loading screen hangs with nothing in the console. And it
+relays `/net` to the Node multiplayer host, starting one if none is running, so
+online play works through the Flask port too — the client derives its socket URL
+from `location`, so behind an https tunnel it asks for `wss://…/net` and lands
+on the same route.
+
+`--tunnel` shells out to `cloudflared` (install it separately) and prints the
+`https://….trycloudflare.com` link it hands back. Anyone with that link can
+play, and it dies when you stop the process. Networks that block
+`api.trycloudflare.com` get told so rather than left waiting.
+
+Flask's development server is what runs here. That is the right call for
+"two friends and a laptop" and the wrong one for real exposure; put it behind
+gunicorn or waitress if this ever becomes more than that.
+
 > **Do not open `index.html` by double-clicking it.** The game is built from
 > JavaScript modules and runs terrain generation on worker threads, and browsers
 > block both over `file://` — you get a black "loading orebound" screen and
