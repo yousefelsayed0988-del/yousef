@@ -76,10 +76,15 @@ await page.waitForTimeout(SECONDS * 500);
 await page.evaluate(() => { window.game.controls.keys.clear(); });
 // let the player actually come to rest before sampling -- sampling mid-jump or
 // mid-fall makes the "supported" assertion flaky for no good reason
+// Releasing the keys does not stop the player dead -- ground friction is
+// 0.91/tick, so they coast for another second and can slide off a ledge.
+// Wait for horizontal motion to actually decay before sampling.
 await page.waitForFunction(
-  () => { const p = window.game.player; return p.onGround || p.inWater || p.inLava; },
-  null, { timeout: 15000 }).catch(() => { });
-await page.waitForTimeout(400);
+  () => {
+    const p = window.game.player;
+    return (p.onGround || p.inWater || p.inLava) && Math.abs(p.vx) + Math.abs(p.vz) < 0.01;
+  },
+  null, { timeout: 20000 }).catch(() => { });
 // If the player walked off into a ravine the settle above can time out while
 // they are still descending. The invariant that matters is "not falling
 // forever", so report vertical velocity too.

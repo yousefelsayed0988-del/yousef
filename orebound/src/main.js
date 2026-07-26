@@ -19,7 +19,7 @@ import { Player, PW, PH } from './player/player.js';
 import { Controls } from './player/controls.js';
 import { selectionBoxes, raycast, setBoxAt } from './player/physics.js';
 import { Entity, ItemEntity, FallingBlock, Arrow, Mob, Boat, PrimedTNT } from './entities/entities.js';
-import { MobSpawner, tickSpawnerBlocks } from './entities/spawn.js';
+import { MobSpawner, tickSpawnerBlocks, populateVillages } from './entities/spawn.js';
 import { GameUI } from './ui/ui.js';
 import { Audio } from './audio/audio.js';
 import { SaveManager } from './save/save.js';
@@ -274,6 +274,7 @@ class Game {
     this.tickWeather();
     this.spawner.tick(p);
     if (w.time % 4 === 0) tickSpawnerBlocks(w, p);
+    if (w.time % 40 === 0) populateVillages(w, p);
     this.tickParticles();
 
     if (this.save.lastSave === 0) this.save.lastSave = performance.now();
@@ -658,6 +659,8 @@ class Game {
     this.ui.openChest(be);
   }
   openSignEditor(be) { this.ui.openSignEditor(be); }
+
+  openTrades(mob) { this.audio.play('open'); this.ui.openTrades(mob); }
 
   openFurnace(x, y, z) {
     let be = this.world.getBlockEntity(x, y, z);

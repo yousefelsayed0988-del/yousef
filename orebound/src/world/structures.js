@@ -50,7 +50,155 @@ export function generateStructures(gen, cx, cz, ctx) {
   for (let dz = -3; dz <= 3; dz++) {
     for (let dx = -3; dx <= 3; dx++) {
       mineshaft(gen, cx + dx, cz + dz, ctx, ox, oz, seed);
+      village(gen, cx + dx, cz + dz, ctx, ox, oz, seed);
     }
+  }
+}
+
+// ------------------------------------------------------------------ village
+// A handful of houses around a well, plus tilled fields and lamp posts. Each
+// building is placed on its own levelled pad so the village survives uneven
+// ground, and each house registers a villager for the spawner to fill in.
+const VILLAGE_WOODS = ['oak', 'spruce', 'birch', 'acacia'];
+
+function village(gen, scx, scz, ctx, ox, oz, seed) {
+  const h = hash2i(scx, scz, subSeed(seed, 'village')) / 4294967296;
+  if (h > 0.006) return;
+  const rng = originRng(seed, scx, scz, 'village');
+  const cxw = (scx << 4) + 8, czw = (scz << 4) + 8;
+
+  const centreBiome = BIOMES[gen.biomeAt(cxw, czw)];
+  if (centreBiome.name === 'ocean' || centreBiome.name === 'swamp' ||
+      centreBiome.name === 'stony_peaks' || centreBiome.name === 'jungle') return;
+  const baseY = gen.heightAt(cxw, czw);
+  if (baseY < SEA_LEVEL + 2 || baseY > 110) return;
+
+  // reject strongly sloped ground rather than carving a terrace into a cliff
+  let lo = 999, hi = -999;
+  for (let dx = -22; dx <= 22; dx += 6) {
+    for (let dz = -22; dz <= 22; dz += 6) {
+      const y = gen.heightAt(cxw + dx, czw + dz);
+      if (y < lo) lo = y;
+      if (y > hi) hi = y;
+    }
+  }
+  if (hi - lo > 7) return;
+
+  const { put, putSoft, blockEntities } = ctx;
+  const wood = VILLAGE_WOODS[rng.int(VILLAGE_WOODS.length)];
+  const planks = blockId(`${wood}_planks`);
+  const logB = blockId(`${wood}_log`);
+  const doorB = blockId(`${wood}_door`);
+  const stairsB = blockId(`${wood}_stairs`);
+  const path = blockId('gravel');
+
+  // --- well at the centre
+  for (let dx = -2; dx <= 2; dx++) {
+    for (let dz = -2; dz <= 2; dz++) {
+      const edge = Math.abs(dx) === 2 || Math.abs(dz) === 2;
+      put(cxw + dx, baseY, czw + dz, edge ? S.cobble : blockId('water'));
+      if (!edge) { put(cxw + dx, baseY - 1, czw + dz, blockId('water')); put(cxw + dx, baseY - 2, czw + dz, S.cobble); }
+      if (edge) put(cxw + dx, baseY + 1, czw + dz, Math.abs(dx) === 2 && Math.abs(dz) === 2 ? S.cobble : S.air);
+      for (let dy = 2; dy <= 4; dy++) put(cxw + dx, baseY + dy, czw + dz, S.air);
+    }
+  }
+  for (const [px, pz] of [[-2, -2], [2, -2], [-2, 2], [2, 2]]) {
+    for (let dy = 1; dy <= 3; dy++) put(cxw + px, baseY + dy, czw + pz, logB);
+  }
+  for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) put(cxw + dx, baseY + 4, czw + dz, planks);
+
+  // --- houses on a loose ring
+  const count = 4 + rng.int(3);
+  for (let i = 0; i < count; i++) {
+    const ang = (i / count) * Math.PI * 2 + rng.float() * 0.5;
+    const dist = 9 + rng.int(9);
+    const hx = cxw + Math.round(Math.cos(ang) * dist);
+    const hz = czw + Math.round(Math.sin(ang) * dist);
+    const hy = gen.heightAt(hx, hz);
+    if (Math.abs(hy - baseY) > 5) continue;
+    if (rng.chance(0.28)) farmPlot(gen, hx, hy, hz, rng, put, putSoft);
+    else house(gen, hx, hy, hz, rng, put, putSoft, blockEntities, ox, oz, seed,
+      { planks, logB, doorB, stairsB });
+    // a gravel path back to the well
+    const steps = Math.max(1, Math.round(dist));
+    for (let k = 3; k < steps; k++) {
+      const px = cxw + Math.round(Math.cos(ang) * k);
+      const pz = czw + Math.round(Math.sin(ang) * k);
+      const py = gen.heightAt(px, pz);
+      put(px, py, pz, path);
+      for (let dy = 1; dy <= 2; dy++) put(px, py + dy, pz, S.air);
+    }
+  }
+
+  // --- lamp posts
+  for (let i = 0; i < 4; i++) {
+    const ang = (i / 4) * Math.PI * 2 + 0.4;
+    const lx = cxw + Math.round(Math.cos(ang) * 7);
+    const lz = czw + Math.round(Math.sin(ang) * 7);
+    const ly = gen.heightAt(lx, lz);
+    for (let dy = 1; dy <= 3; dy++) put(lx, ly + dy, lz, logB);
+    put(lx, ly + 4, lz, S.torch);
+  }
+}
+
+function house(gen, hx, hy, hz, rng, put, putSoft, blockEntities, ox, oz, seed, mat) {
+  const w = 2 + rng.int(2), d = 2 + rng.int(2), tall = 3;
+  const facing = rng.int(4);
+
+  for (let dx = -w - 1; dx <= w + 1; dx++) {
+    for (let dz = -d - 1; dz <= d + 1; dz++) {
+      // levelled foundation so the house is never half-buried
+      put(hx + dx, hy, hz + dz, mat.planks);
+      for (let k = 1; k <= 3; k++) put(hx + dx, hy - k, hz + dz, S.cobble);
+      const wall = Math.abs(dx) === w + 1 || Math.abs(dz) === d + 1;
+      for (let dy = 1; dy <= tall; dy++) {
+        if (!wall) { put(hx + dx, hy + dy, hz + dz, S.air); continue; }
+        const corner = Math.abs(dx) === w + 1 && Math.abs(dz) === d + 1;
+        // a window band at head height
+        const window = !corner && dy === 2 && ((dx + dz) % 2 === 0);
+        put(hx + dx, hy + dy, hz + dz, corner ? mat.logB : (window ? blockId('glass_pane') : mat.planks));
+      }
+      put(hx + dx, hy + tall + 1, hz + dz, mat.planks);
+    }
+  }
+  // door in the middle of one wall
+  const dv = [[0, -d - 1], [w + 1, 0], [0, d + 1], [-w - 1, 0]][facing];
+  const dx0 = hx + dv[0], dz0 = hz + dv[1];
+  put(dx0, hy + 1, dz0, mat.doorB, (facing << 2));
+  put(dx0, hy + 2, dz0, mat.doorB, (facing << 2) | 1);
+  put(dx0, hy + 3, dz0, mat.planks);
+
+  // furnishings
+  put(hx - w, hy + 1, hz - d, blockId('crafting_table'));
+  put(hx + w, hy + 1, hz - d, blockId('furnace'), 2);
+  putSoft(hx, hy + tall, hz, S.torch);
+  const cx2 = hx + w, cz2 = hz + d;
+  put(cx2, hy + 1, cz2, S.chest, rng.int(4));
+  if (inside(cx2, cz2, ox, oz)) {
+    const lr = new Random(hash3i(cx2, hy, cz2, subSeed(seed, 'village_loot')));
+    blockEntities.push({ x: cx2, y: hy + 1, z: cz2, type: 'chest', items: fillChest('ruins', lr) });
+  }
+  // register a resident; the spawner turns these into villagers on load
+  if (inside(hx, hz, ox, oz)) {
+    blockEntities.push({ x: hx, y: hy + 1, z: hz, type: 'villager_spawn' });
+  }
+}
+
+function farmPlot(gen, fx, fy, fz, rng, put, putSoft) {
+  const crops = ['wheat', 'carrots', 'potatoes'];
+  const crop = blockId(crops[rng.int(crops.length)]);
+  for (let dx = -3; dx <= 3; dx++) {
+    for (let dz = -2; dz <= 2; dz++) {
+      const edge = Math.abs(dx) === 3 || Math.abs(dz) === 2;
+      const y = fy;
+      if (edge) { put(fx + dx, y, fz + dz, blockId('oak_log')); continue; }
+      if (dx === 0) { put(fx + dx, y, fz + dz, blockId('water')); continue; }
+      put(fx + dx, y, fz + dz, blockId('farmland'), 7);
+      put(fx + dx, y + 1, fz + dz, crop, rng.int(8));
+    }
+  }
+  for (let dx = -3; dx <= 3; dx++) for (let dz = -2; dz <= 2; dz++) {
+    for (let dy = 2; dy <= 3; dy++) put(fx + dx, fy + dy, fz + dz, S.air);
   }
 }
 

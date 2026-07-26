@@ -102,6 +102,111 @@ const MODELS = {
     eyes: [[-3, 14, -13.3, -1.5, 15.5, -12.9], [1.5, 14, -13.3, 3, 15.5, -12.9]],
     eyeColor: 0x141414,
   },
+  rabbit: {
+    parts: [
+      [-2.5, 2, -3, 2.5, 6, 3, 0xa28b6f, 0],
+      [-2, 4, -6, 2, 8, -3, 0xb5997a, 5],
+      [-1.6, 8, -5.4, -0.4, 12, -4.4, 0xb5997a, 5],
+      [0.4, 8, -5.4, 1.6, 12, -4.4, 0xb5997a, 5],
+      [-2.5, 0, -2.5, -0.8, 2, -0.5, 0x8d7860, 1],
+      [0.8, 0, -2.5, 2.5, 2, -0.5, 0x8d7860, 2],
+      [-2.5, 0, 1, -0.8, 2, 3.5, 0x8d7860, 3],
+      [0.8, 0, 1, 2.5, 2, 3.5, 0x8d7860, 4],
+      [-1.2, 3, 3, 1.2, 5, 4.4, 0xe8e2d8, 0],
+    ],
+    eyes: [[-2.1, 6, -6.3, -1, 7.1, -5.9], [1, 6, -6.3, 2.1, 7.1, -5.9]],
+    eyeColor: 0x2a1414,
+  },
+  wolf: {
+    parts: [
+      [-3, 6, -4, 3, 12, 6, 0xd8d4cc, 0],
+      [-2.5, 7, -9, 2.5, 12.5, -4, 0xe4e0d8, 5],
+      [-2.5, 12.5, -8, -0.6, 15, -6, 0xd0ccc4, 5],
+      [0.6, 12.5, -8, 2.5, 15, -6, 0xd0ccc4, 5],
+      [-1.2, 8.2, -10.6, 1.2, 10, -8.6, 0x3a3630, 5],
+      [-2.6, 0, -3, -0.8, 6, -1, 0xcfcbc2, 1],
+      [0.8, 0, -3, 2.6, 6, -1, 0xcfcbc2, 2],
+      [-2.6, 0, 2.5, -0.8, 6, 4.5, 0xcfcbc2, 3],
+      [0.8, 0, 2.5, 2.6, 6, 4.5, 0xcfcbc2, 4],
+      [-0.9, 8, 5.5, 0.9, 13, 8, 0xd8d4cc, 0],
+    ],
+    eyes: [[-1.8, 10, -9.3, -0.7, 11, -8.9], [0.7, 10, -9.3, 1.8, 11, -8.9]],
+    eyeColor: 0xc02020,
+  },
+  fox: {
+    parts: [
+      [-2.5, 4, -4, 2.5, 9, 6, 0xd67f31, 0],
+      [-2.2, 5, -9, 2.2, 9.5, -4, 0xe08a3c, 5],
+      [-2.2, 9.5, -8, -0.5, 12, -6.2, 0xc46a26, 5],
+      [0.5, 9.5, -8, 2.2, 12, -6.2, 0xc46a26, 5],
+      [-1.1, 5.8, -11, 1.1, 7.4, -9, 0xf0ece4, 5],
+      [-2.3, 0, -3, -0.8, 4, -1.4, 0x3a2a1e, 1],
+      [0.8, 0, -3, 2.3, 4, -1.4, 0x3a2a1e, 2],
+      [-2.3, 0, 2.6, -0.8, 4, 4.2, 0x3a2a1e, 3],
+      [0.8, 0, 2.6, 2.3, 4, 4.2, 0x3a2a1e, 4],
+      [-1.6, 5, 5.5, 1.6, 8, 10, 0xf0ece4, 0],
+    ],
+    eyes: [[-1.6, 7.4, -9.3, -0.6, 8.4, -8.9], [0.6, 7.4, -9.3, 1.6, 8.4, -8.9]],
+    eyeColor: 0x141414,
+  },
+  horse: {
+    parts: [
+      [-4, 11, -8, 4, 19, 8, 0x6b4a2c, 0],
+      [-2.5, 16, -15, 2.5, 22, -8, 0x775432, 5],
+      [-2, 21, -13.5, -0.4, 24, -12, 0x775432, 5],
+      [0.4, 21, -13.5, 2, 24, -12, 0x775432, 5],
+      [-1.6, 12.5, -18, 1.6, 17, -14, 0x5a3d24, 5],
+      [-0.8, 19, -14, 0.8, 24, -8, 0x2e2018, 5],
+      [-4, 0, -6, -1.4, 11, -3, 0x5f4227, 1],
+      [1.4, 0, -6, 4, 11, -3, 0x5f4227, 2],
+      [-4, 0, 4, -1.4, 11, 7, 0x5f4227, 3],
+      [1.4, 0, 4, 4, 11, 7, 0x5f4227, 4],
+      [-0.7, 14, 8, 0.7, 20, 12, 0x2e2018, 0],
+    ],
+    eyes: [[-2.3, 19, -15.3, -1.1, 20.2, -14.9], [1.1, 19, -15.3, 2.3, 20.2, -14.9]],
+    eyeColor: 0x141414,
+  },
+  squid: {
+    parts: [
+      [-4, 4, -4, 4, 12, 4, 0x5a4a80, 0],
+      [-1.2, 0, -4.4, 1.2, 4.5, -2, 0x4d3f6e, 1],
+      [-4.4, 0, -1.2, -2, 4.5, 1.2, 0x4d3f6e, 2],
+      [2, 0, -1.2, 4.4, 4.5, 1.2, 0x4d3f6e, 3],
+      [-1.2, 0, 2, 1.2, 4.5, 4.4, 0x4d3f6e, 4],
+      [-3.2, 0, -3.6, -1.4, 4, -1.8, 0x4d3f6e, 2],
+      [1.4, 0, -3.6, 3.2, 4, -1.8, 0x4d3f6e, 1],
+      [-3.2, 0, 1.8, -1.4, 4, 3.6, 0x4d3f6e, 4],
+      [1.4, 0, 1.8, 3.2, 4, 3.6, 0x4d3f6e, 3],
+    ],
+    eyes: [[-4.3, 9, -2.2, -3.8, 10.6, -0.6], [3.8, 9, -2.2, 4.3, 10.6, -0.6]],
+    eyeColor: 0xe0e0e0,
+  },
+  bat: {
+    parts: [
+      [-2, 4, -2, 2, 10, 2, 0x4a3a30, 0],
+      [-2, 9, -2.4, 2, 13, 1.6, 0x584538, 5],
+      [-2.4, 12.5, -1.6, -0.6, 15, -0.2, 0x584538, 5],
+      [0.6, 12.5, -1.6, 2.4, 15, -0.2, 0x584538, 5],
+      [-9, 5, -0.6, -2, 12, 0.6, 0x3c2f26, 6],
+      [2, 5, -0.6, 9, 12, 0.6, 0x3c2f26, 6],
+    ],
+    eyes: [[-1.5, 11, -2.7, -0.6, 11.9, -2.3], [0.6, 11, -2.7, 1.5, 11.9, -2.3]],
+    eyeColor: 0xc02020,
+  },
+  villager: {
+    parts: [
+      [-4, 24, -4, 4, 32, 4, 0xb8825f, 5],
+      [-1.2, 25, -5.2, 1.2, 28, -3.8, 0xa06f4f, 5],
+      [-4, 10, -3, 4, 24, 3, null, 0],
+      [-2, 22, -3.4, 2, 24, 3.4, 0x8a6a4a, 0],
+      [-2, 0, -2, -0.2, 10, 2, 0x3b3b46, 1],
+      [0.2, 0, -2, 2, 10, 2, 0x3b3b46, 2],
+      [-6, 12, -2.2, -4, 23, 2.2, null, 6],
+      [4, 12, -2.2, 6, 23, 2.2, null, 6],
+    ],
+    eyes: [[-2.6, 28, -4.3, -1.4, 29.2, -3.9], [1.4, 28, -4.3, 2.6, 29.2, -3.9]],
+    eyeColor: 0x2a2a3a,
+  },
   chicken: {
     parts: [
       [-3, 5, -3, 3, 11, 4, 0xf0f0ee, 0],
@@ -120,6 +225,12 @@ const MODELS = {
 
 const WOOL_COLORS = DYES.map(d => d[1]);
 
+/** Villager robes read their trade at a glance. */
+const PROFESSION_COLORS = {
+  farmer: 0x8a6a3a, librarian: 0xd8d0b0, blacksmith: 0x3b4250,
+  butcher: 0xd8d8d8, cleric: 0x7a3fa0, cartographer: 0xd8c88a,
+};
+
 /**
  * Push one entity's boxes into the renderer's immediate-mode batch.
  * @param {number} light 0..1 light multiplier sampled at the entity position
@@ -131,6 +242,8 @@ export function drawMob(renderer, mob, pos, light) {
   const scale = mob.baby ? 0.55 : 1;
   const swing = mob.moving ? Math.sin(mob.walkPhase) * 2.2 : 0;
   const swing2 = mob.moving ? Math.sin(mob.walkPhase + Math.PI) * 2.2 : 0;
+  // bats beat their wings continuously; anim slot 6 doubles as the wing slot
+  const flap = mob.def && mob.def.flying ? Math.sin(mob.wingPhase || 0) * 3.2 : 0;
   const hurt = mob.hurtTimer > 0;
   const fuse = mob.fuse >= 0 ? (Math.floor(mob.fuse / 3) % 2 === 0 ? 1 : 0) : 0;
   const burning = mob.fireTicks > 0;
@@ -139,7 +252,7 @@ export function drawMob(renderer, mob, pos, light) {
     let dz = 0, dy = 0;
     if (anim === 1 || anim === 4) dz = swing;
     else if (anim === 2 || anim === 3) dz = swing2;
-    else if (anim === 6) dz = swing * 0.7;
+    else if (anim === 6) { dz = swing * 0.7; if (flap) { dy = flap; dz = 0; } }
     else if (anim === 5) dy = mob.moving ? Math.abs(Math.sin(mob.walkPhase)) * 0.4 : 0;
 
     let c = color;
@@ -156,7 +269,9 @@ export function drawMob(renderer, mob, pos, light) {
   for (const p of model.parts) {
     let color = p[6];
     if (color === null) {
-      color = mob.sheared ? 0xe8dcc8 : (WOOL_COLORS[mob.woolColor % WOOL_COLORS.length] || 0xe9ecec);
+      color = mob.type === 'villager'
+        ? (PROFESSION_COLORS[mob.profession] || 0x8a6a4a)
+        : (mob.sheared ? 0xe8dcc8 : (WOOL_COLORS[mob.woolColor % WOOL_COLORS.length] || 0xe9ecec));
     }
     emit(p[0], p[1], p[2], p[3], p[4], p[5], color, p[7]);
   }

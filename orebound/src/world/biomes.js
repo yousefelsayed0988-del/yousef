@@ -59,23 +59,23 @@ biome('plains', {
   surface: 'grass_block', trees: { type: 'oak', density: 0.12 }, grass: 0.45, flowers: 0.08,
   heightScale: 0.55, rainBias: 0.4,
   grassTint: 0x91bd59, foliageTint: 0x77ab2f,
-  mobs: { cow: 10, sheep: 14, pig: 10, chicken: 10 },
+  mobs: { cow: 10, sheep: 14, pig: 10, chicken: 10, horse: 6, rabbit: 4 },
 });
 biome('sunflower_plains', {
   surface: 'grass_block', trees: { type: 'oak', density: 0.08 }, grass: 0.55, flowers: 0.25,
   heightScale: 0.5, grassTint: 0x91bd59, foliageTint: 0x77ab2f,
-  mobs: { cow: 10, sheep: 14, pig: 10, chicken: 10 },
+  mobs: { cow: 10, sheep: 14, pig: 10, chicken: 10, horse: 5, rabbit: 4 },
 });
 biome('forest', {
   surface: 'grass_block', trees: { type: 'oak_birch', density: 5.5 }, grass: 0.35, flowers: 0.06,
   heightScale: 0.8, rainBias: 0.55,
   grassTint: 0x79c05a, foliageTint: 0x59ae30,
-  mobs: { cow: 8, sheep: 10, pig: 8, chicken: 8 },
+  mobs: { cow: 8, sheep: 10, pig: 8, chicken: 8, wolf: 3, fox: 3 },
 });
 biome('birch_forest', {
   surface: 'grass_block', trees: { type: 'birch', density: 5.0 }, grass: 0.3, flowers: 0.05,
   heightScale: 0.8, grassTint: 0x88bb67, foliageTint: 0x6ba941,
-  mobs: { cow: 8, sheep: 8, pig: 8, chicken: 8 },
+  mobs: { cow: 8, sheep: 8, pig: 8, chicken: 8, fox: 4 },
 });
 biome('dark_forest', {
   surface: 'grass_block', trees: { type: 'dark_oak', density: 7.0 }, grass: 0.25, flowers: 0.03,
@@ -87,34 +87,34 @@ biome('taiga', {
   surface: 'grass_block', subsurface: 'dirt', trees: { type: 'spruce', density: 5.0 },
   grass: 0.3, flowers: 0.02, mushrooms: 0.02, heightScale: 1.0, rainBias: 0.6,
   grassTint: 0x86b783, foliageTint: 0x68a464,
-  mobs: { cow: 8, sheep: 8, pig: 6, chicken: 6 },
+  mobs: { cow: 8, sheep: 8, pig: 6, chicken: 6, wolf: 8, fox: 5, rabbit: 4 },
 });
 biome('snowy_taiga', {
   surface: 'grass_block', trees: { type: 'spruce', density: 4.0 }, snow: true,
   grass: 0.15, flowers: 0.0, heightScale: 1.0, rainBias: 0.8,
   grassTint: 0x80b497, foliageTint: 0x60a17b, waterTint: 0x3d57d6,
   skyTint: 0x8fb2ff, fogTint: 0xdbe7ff,
-  mobs: { sheep: 6, chicken: 4 },
+  mobs: { sheep: 6, chicken: 4, wolf: 6, fox: 6, rabbit: 6 },
 });
 biome('snowy_tundra', {
   surface: 'grass_block', trees: null, snow: true, grass: 0.05, flowers: 0.0, sugarCane: 0,
   heightScale: 0.5, rainBias: 0.8,
   grassTint: 0x80b497, foliageTint: 0x60a17b, waterTint: 0x3d57d6,
   skyTint: 0x8fb2ff, fogTint: 0xe2edff,
-  mobs: { sheep: 4 },
+  mobs: { sheep: 4, rabbit: 5, fox: 3 },
 });
 biome('desert', {
   surface: 'sand', subsurface: 'sand', underwater: 'sand', depth: 5, trees: null,
   grass: 0, flowers: 0, cactus: 0.12, deadBush: 0.06, sugarCane: 0.1, mushrooms: 0,
   heightScale: 0.5, rainBias: 0.0,
   grassTint: 0xbfb755, foliageTint: 0xaea42a, skyTint: 0x86b5ff, fogTint: 0xe8d9a8,
-  mobs: { },
+  mobs: { rabbit: 4 },
 });
 biome('savanna', {
   surface: 'grass_block', trees: { type: 'acacia', density: 1.0 }, grass: 0.5, flowers: 0.01,
   heightScale: 0.6, rainBias: 0.1,
   grassTint: 0xbfb755, foliageTint: 0xaea42a, skyTint: 0x86b5ff, fogTint: 0xdfe0b0,
-  mobs: { cow: 10, sheep: 8, chicken: 6 },
+  mobs: { cow: 10, sheep: 8, chicken: 6, horse: 8 },
 });
 biome('jungle', {
   surface: 'grass_block', trees: { type: 'jungle', density: 8.0 }, grass: 0.6, flowers: 0.04,
@@ -134,13 +134,13 @@ biome('cherry_grove', {
   surface: 'grass_block', trees: { type: 'cherry', density: 2.0 }, grass: 0.5, flowers: 0.2,
   heightScale: 0.9, rainBias: 0.5,
   grassTint: 0xb6db61, foliageTint: 0xb6db61, skyTint: 0x8ab6ff, fogTint: 0xf0d0e0,
-  mobs: { sheep: 12, pig: 8, chicken: 8 },
+  mobs: { sheep: 12, pig: 8, chicken: 8, rabbit: 5 },
 });
 biome('mountains', {
   surface: 'grass_block', subsurface: 'dirt', trees: { type: 'spruce', density: 0.6 },
   grass: 0.15, flowers: 0.02, heightScale: 1.0, heightOffset: 0, rainBias: 0.6,
   grassTint: 0x8ab689, foliageTint: 0x6da36c, skyTint: 0x88b0ff, fogTint: 0xd0e0ff,
-  mobs: { sheep: 6 },
+  mobs: { sheep: 6, rabbit: 4 },
 });
 biome('stony_peaks', {
   surface: 'stone', subsurface: 'stone', underwater: 'stone', trees: null,

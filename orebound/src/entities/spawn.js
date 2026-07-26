@@ -32,6 +32,7 @@ export class MobSpawner {
     if (--this.passiveTimer <= 0) {
       this.passiveTimer = 400;
       this.spawnWave(player, false);
+      this.spawnAmbient(player);
     }
   }
 
@@ -132,9 +133,83 @@ export class MobSpawner {
     return true;
   }
 
+  /**
+   * Squid in open water, bats in dark caves. These sit outside the normal
+   * surface/light rules -- squid need water above and below, bats need
+   * enclosed darkness -- so they get their own pass.
+   */
+  spawnAmbient(player) {
+    const w = this.world;
+    const sim = CONFIG.simulationDistance;
+    let squid = 0, bats = 0;
+    for (const e of w.entities) {
+      if (e.dead || !(e instanceof Mob)) continue;
+      if (e.type === 'squid') squid++;
+      else if (e.type === 'bat') bats++;
+    }
+
+    for (let i = 0; i < 8 && squid < 8; i++) {
+      const x = Math.floor(player.x) + this.rng.int(sim * 32) - sim * 16;
+      const z = Math.floor(player.z) + this.rng.int(sim * 32) - sim * 16;
+      if (!w.isLoaded(x >> 4, z >> 4)) continue;
+      const surface = w.topSolid(x, z);
+      if (BLOCKS[w.getBlock(x, surface, z)].liquid !== 'water') continue;
+      const y = surface - 1 - this.rng.int(6);
+      if (y < WORLD.MIN_Y + 4) continue;
+      if (BLOCKS[w.getBlock(x, y, z)].liquid !== 'water') continue;
+      if (BLOCKS[w.getBlock(x, y + 1, z)].liquid !== 'water') continue;
+      if (Math.hypot(x - player.x, z - player.z) < 12) continue;
+      w.entities.push(new Mob(w, 'squid', x + 0.5, y, z + 0.5));
+      squid++;
+    }
+
+    for (let i = 0; i < 8 && bats < 6; i++) {
+      const x = Math.floor(player.x) + this.rng.int(sim * 24) - sim * 12;
+      const z = Math.floor(player.z) + this.rng.int(sim * 24) - sim * 12;
+      if (!w.isLoaded(x >> 4, z >> 4)) continue;
+      const y = Math.floor(player.y) + this.rng.int(16) - 8;
+      if (y < WORLD.MIN_Y + 6 || y > 50) continue;
+      if (w.getBlock(x, y, z) !== AIR || w.getBlock(x, y + 1, z) !== AIR) continue;
+      if (w.getSkyLight(x, y, z) > 3) continue;         // caves only
+      if (w.lightLevel(x, y, z) > 6) continue;
+      if (Math.hypot(x - player.x, y - player.y, z - player.z) < 10) continue;
+      w.entities.push(new Mob(w, 'bat', x + 0.5, y, z + 0.5));
+      bats++;
+    }
+  }
+
   hasRoom(x, y, z, width, height) {
     const box = setBoxAt({ x0: 0, y0: 0, z0: 0, x1: 0, y1: 0, z1: 0 }, x + 0.5, y, z + 0.5, width, height);
     return !boxCollides(this.world, box);
+  }
+}
+
+/**
+ * Villages record a "villager_spawn" marker per house at generation time.
+ * The first time a marked chunk ticks we turn each marker into a real
+ * villager and clear it, so villages are populated without the generator
+ * needing to know anything about entities.
+ */
+export function populateVillages(world, player) {
+  const r = CONFIG.simulationDistance;
+  const pcx = Math.floor(player.x) >> 4, pcz = Math.floor(player.z) >> 4;
+  for (let dz = -r; dz <= r; dz++) {
+    for (let dx = -r; dx <= r; dx++) {
+      const c = world.getChunk(pcx + dx, pcz + dz);
+      if (!c || c.villagersPlaced) continue;
+      let placed = false;
+      for (const [key, be] of [...c.blockEntities]) {
+        if (be.type !== 'villager_spawn') continue;
+        c.blockEntities.delete(key);
+        const y = world.topSolid(be.x, be.z) + 1;
+        const m = new Mob(world, 'villager', be.x + 0.5, Math.max(be.y, y - 4), be.z + 0.5);
+        m.persistent = true;
+        world.entities.push(m);
+        placed = true;
+      }
+      c.villagersPlaced = true;
+      if (placed) c.dirtySave = true;
+    }
   }
 }
 

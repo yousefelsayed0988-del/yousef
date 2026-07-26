@@ -212,6 +212,19 @@
   .progress.wide { width: 100%; margin-top: 14px; }
   .progress i { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, #79c05a, #b6db61); transition: width .12s linear; }
 
+  .trade-list { display: flex; flex-direction: column; gap: 4px; min-width: 470px; max-height: 46vh; overflow-y: auto; }
+  .trade-row {
+    display: flex; align-items: center; gap: 12px; padding: 7px 10px;
+    background: rgba(255,255,255,.045); border: 1px solid var(--slot-edge); border-radius: 8px;
+  }
+  .trade-row.unavailable { opacity: .45; }
+  .trade-side { display: flex; gap: 10px; flex: 1; flex-wrap: wrap; }
+  .trade-item { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--dim); }
+  .trade-icon { width: 24px; height: 24px; background-size: contain; background-repeat: no-repeat; image-rendering: pixelated; }
+  .trade-arrow { color: var(--faint); font-size: 16px; }
+  .trade-btn { padding: 6px 14px; font-size: 12.5px; }
+  .trade-btn:disabled { opacity: .5; cursor: default; }
+
   .menu-buttons { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; }
   button {
     font: inherit; font-size: 14px; color: var(--ink); background: rgba(255,255,255,.07);

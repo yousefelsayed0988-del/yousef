@@ -340,7 +340,14 @@ export const MOB_TYPES = {
   pig: { hp: 10, w: 0.9, h: 0.9, speed: 0.11, hostile: false, food: ['carrot', 'potato'], drops: 'pig' },
   sheep: { hp: 8, w: 0.9, h: 1.3, speed: 0.11, hostile: false, food: ['wheat'], drops: 'sheep', shearable: true },
   chicken: { hp: 4, w: 0.4, h: 0.7, speed: 0.13, hostile: false, food: ['wheat_seeds', 'melon_seeds', 'pumpkin_seeds'], drops: 'chicken' },
-  zombie: { hp: 20, w: 0.6, h: 1.95, speed: 0.115, hostile: true, damage: 3, drops: 'zombie', burnsInDay: true },
+  rabbit: { hp: 3, w: 0.4, h: 0.5, speed: 0.16, hostile: false, food: ['carrot', 'dandelion'], drops: 'rabbit', skittish: 8, hops: true },
+  wolf: { hp: 8, w: 0.6, h: 0.85, speed: 0.15, hostile: false, food: ['bone'], drops: 'wolf', tameable: 'bone', packHunter: true },
+  fox: { hp: 10, w: 0.6, h: 0.7, speed: 0.16, hostile: false, food: ['sweet_berries', 'chicken'], drops: 'fox', skittish: 10, nocturnal: true, hunts: ['chicken', 'rabbit'] },
+  horse: { hp: 15, w: 1.3, h: 1.6, speed: 0.14, hostile: false, food: ['wheat', 'apple'], drops: 'horse', tameable: 'apple', rideable: true },
+  squid: { hp: 10, w: 0.8, h: 0.8, speed: 0.09, hostile: false, drops: 'squid', aquatic: true },
+  bat: { hp: 6, w: 0.5, h: 0.9, speed: 0.13, hostile: false, drops: 'bat', flying: true, nocturnal: true },
+  villager: { hp: 20, w: 0.6, h: 1.95, speed: 0.09, hostile: false, drops: 'villager', trades: true, fleesHostiles: true },
+  zombie: { hp: 20, w: 0.6, h: 1.95, speed: 0.115, hostile: true, damage: 3, drops: 'zombie', burnsInDay: true, hunts: ['villager'] },
   skeleton: { hp: 20, w: 0.6, h: 1.99, speed: 0.125, hostile: true, damage: 2, ranged: true, drops: 'skeleton', burnsInDay: true },
   creeper: { hp: 20, w: 0.6, h: 1.7, speed: 0.11, hostile: true, damage: 0, explodes: true, drops: 'creeper' },
   spider: { hp: 16, w: 1.4, h: 0.9, speed: 0.15, hostile: true, damage: 2, climbs: true, dayPassive: true, drops: 'spider' },
@@ -371,6 +378,17 @@ export class Mob extends Entity {
     this.jumpCooldown = 0;
     this.persistent = false;
     this.aggro = 0;
+    this.tamed = false;
+    this.owner = null;
+    this.sitting = false;
+    this.huntCooldown = 0;
+    this.attackTarget = null;
+    if (t.trades) {
+      const profs = ['farmer', 'librarian', 'blacksmith', 'butcher', 'cleric', 'cartographer'];
+      this.profession = profs[this.rng.int(profs.length)];
+      this.tradeUses = {};
+      this.persistent = true;
+    }
   }
 
   get simDistance2() { return (CONFIG.simulationDistance * 16) ** 2; }
@@ -391,8 +409,13 @@ export class Mob extends Entity {
     if (this.loveTimer > 0) this.loveTimer--;
 
     this.burnInDaylight();
-    this.ai(p, dx, dz, dist2);
-    this.physics(0.85);
+    if (!this.rider) this.ai(p, dx, dz, dist2);
+    // flying and swimming mobs cancel gravity themselves; their AI sets vy
+    const savedGravity = this.gravity;
+    if (this.def.flying) this.gravity = 0;
+    if (this.def.aquatic && this.inWater) this.gravity = 0;
+    this.physics(this.def.flying ? 0.96 : 0.85);
+    this.gravity = savedGravity;
 
     if (this.inLava) this.damage(4, null);
     if (this.fireTicks > 0) {
@@ -404,7 +427,40 @@ export class Mob extends Entity {
     if (this.age % 40 === 0 && boxCollides(this.world, setBoxAt(this.box, this.x, this.y + this.height - 0.2, this.z, 0.2, 0.1))) {
       this.damage(1, null);
     }
+    if (this.rider) this.tickRidden();
     if (this.moving) this.walkPhase += 0.28;
+  }
+
+  /** A tamed, mounted horse steers from the rider's input. */
+  tickRidden() {
+    const p = this.rider;
+    const input = this.world.game.controls.state;
+    if (input.sneak) { this.dismountRider(); return; }
+    this.yaw = p.yaw;
+    const drive = (input.forward ? 1 : 0) - (input.back ? 0.55 : 0);
+    if (drive !== 0) {
+      const s = this.def.speed * 1.55 * drive;
+      this.vx += (Math.sin(this.yaw) * s - this.vx) * 0.4;
+      this.vz += (-Math.cos(this.yaw) * s - this.vz) * 0.4;
+      this.moving = true;
+    } else this.moving = false;
+    if (input.jump && this.onGround) this.vy = 0.52;
+    p.x = this.x; p.z = this.z;
+    p.y = this.y + this.height * 0.72;
+    p.px = p.x; p.py = p.y; p.pz = p.z;
+    p.vx = p.vy = p.vz = 0;
+    p.fallDistance = 0;
+    p.onGround = this.onGround;
+  }
+
+  dismountRider() {
+    if (!this.rider) return;
+    const p = this.rider;
+    p.riding = null;
+    p.x = this.x + 1.2;
+    p.y = this.y + 1.0;
+    p.px = p.x; p.py = p.y; p.pz = p.z;
+    this.rider = null;
   }
 
   burnInDaylight() {
@@ -421,6 +477,58 @@ export class Mob extends Entity {
     const w = this.world;
     const diff = difficulty();
     let chase = false;
+
+    // --- aquatic and flying mobs ignore the walking AI entirely
+    if (this.def.aquatic) return this.aiSwim(p, dist2);
+    if (this.def.flying) return this.aiFly(p, dist2);
+
+    // --- a tamed wolf follows its owner and fights what attacks them
+    if (this.tamed && this.owner) {
+      const od2 = (this.owner.x - this.x) ** 2 + (this.owner.z - this.z) ** 2;
+      if (this.attackTarget && !this.attackTarget.dead && od2 < 24 * 24) {
+        this.pursue(this.attackTarget);
+        return;
+      }
+      if (od2 > 100) { this.faceTowards(this.owner.x, this.owner.z); this.step(1.25); return; }
+      if (od2 > 9) { this.faceTowards(this.owner.x, this.owner.z); this.step(0.9); return; }
+      this.moving = false;
+      return;
+    }
+
+    // --- predators hunt smaller animals
+    if (this.def.hunts && (!this.huntCooldown || this.huntCooldown <= 0)) {
+      // a hostile only turns on other mobs when the player is not right there
+      if (!(this.hostile && dist2 < 100)) {
+        const prey = this.findPrey();
+        if (prey) { this.pursue(prey); return; }
+      }
+    }
+    if (this.huntCooldown > 0) this.huntCooldown--;
+
+    // --- villagers keep away from anything hostile
+    if (this.def.fleesHostiles) {
+      let threat = null, td = 64;
+      for (const e of w.entities) {
+        if (e.dead || !(e instanceof Mob) || !e.hostile) continue;
+        const d = (e.x - this.x) ** 2 + (e.z - this.z) ** 2;
+        if (d < td) { td = d; threat = e; }
+      }
+      if (threat) {
+        this.faceTowards(this.x * 2 - threat.x, this.z * 2 - threat.z);
+        this.step(1.3);
+        return;
+      }
+    }
+
+    // --- skittish animals bolt when the player gets close
+    if (this.def.skittish && !this.tamed) {
+      const r = this.def.skittish;
+      if (dist2 < r * r) {
+        this.faceTowards(this.x * 2 - p.x, this.z * 2 - p.z);
+        this.step(1.35);
+        return;
+      }
+    }
 
     if (this.hostile && diff.hostiles && !p.dead) {
       const passiveByDay = this.def.dayPassive && !w.isNight() &&
@@ -485,6 +593,88 @@ export class Mob extends Entity {
     }
   }
 
+  /** Turn to face a world position. */
+  faceTowards(x, z) {
+    this.targetYaw = Math.atan2(x - this.x, -(z - this.z));
+    this.yaw = approachAngle(this.yaw, this.targetYaw, 0.3);
+  }
+
+  /** Close on a target entity and bite it. */
+  pursue(target) {
+    const d = Math.hypot(target.x - this.x, target.z - this.z);
+    this.faceTowards(target.x, target.z);
+    if (d > 1.3) { this.step(1.2); return; }
+    this.moving = false;
+    if (this.attackCooldown <= 0) {
+      this.attackCooldown = 20;
+      target.damage(this.def.damage || 3, this);
+      target.knockback(target.x - this.x, target.z - this.z, 0.35);
+      if (target.dead) { this.attackTarget = null; this.huntCooldown = 400; }
+    }
+  }
+
+  findPrey() {
+    let best = null, bestD = 12 * 12;
+    for (const e of this.world.entities) {
+      if (e.dead || !(e instanceof Mob)) continue;
+      if (!this.def.hunts.includes(e.type)) continue;
+      const d = (e.x - this.x) ** 2 + (e.z - this.z) ** 2;
+      if (d < bestD) { bestD = d; best = e; }
+    }
+    return best;
+  }
+
+  /** Squid: drifts through water, sinks toward it if beached. */
+  aiSwim(p, dist2) {
+    const w = this.world;
+    if (!this.inWater) {
+      this.moving = false;
+      this.vy -= 0.01;
+      if (this.age % 40 === 0) this.damage(1, null);   // suffocating out of water
+      return;
+    }
+    this.wanderTimer--;
+    if (this.wanderTimer <= 0) {
+      this.wanderTimer = 30 + this.rng.int(70);
+      this.targetYaw = this.rng.float() * Math.PI * 2;
+      this.swimRise = (this.rng.float() - 0.45) * 0.05;
+    }
+    this.yaw = approachAngle(this.yaw, this.targetYaw, 0.08);
+    const s = this.def.speed;
+    this.vx += (Math.sin(this.yaw) * s - this.vx) * 0.12;
+    this.vz += (-Math.cos(this.yaw) * s - this.vz) * 0.12;
+    this.vy += (this.swimRise || 0) * 0.5;
+    // keep clear of the surface and the bed
+    const above = w.getBlock(Math.floor(this.x), Math.floor(this.y + 1.2), Math.floor(this.z));
+    if (!BLOCKS[above].liquid) this.vy -= 0.02;
+    this.moving = true;
+  }
+
+  /** Bat: flaps around caves, avoids daylight, never lands for long. */
+  aiFly(p, dist2) {
+    const w = this.world;
+    this.wanderTimer--;
+    if (this.wanderTimer <= 0) {
+      this.wanderTimer = 25 + this.rng.int(50);
+      this.targetYaw = this.rng.float() * Math.PI * 2;
+      this.flyRise = (this.rng.float() - 0.4) * 0.09;
+    }
+    this.yaw = approachAngle(this.yaw, this.targetYaw, 0.10);
+    const s = this.def.speed;
+    this.vx += (Math.sin(this.yaw) * s - this.vx) * 0.15;
+    this.vz += (-Math.cos(this.yaw) * s - this.vz) * 0.15;
+    // hold altitude: climb off the floor, duck under ceilings
+    const below = isSolidCube(w.getBlock(Math.floor(this.x), Math.floor(this.y - 1.5), Math.floor(this.z)));
+    const above = isSolidCube(w.getBlock(Math.floor(this.x), Math.floor(this.y + 1.6), Math.floor(this.z)));
+    let rise = this.flyRise || 0;
+    if (below) rise += 0.06;
+    if (above) rise -= 0.09;
+    this.vy += rise;
+    this.vy = Math.max(-0.22, Math.min(0.22, this.vy));
+    this.moving = true;
+    this.wingPhase = (this.wingPhase || 0) + 0.85;
+  }
+
   wander() {
     this.wanderTimer--;
     if (this.wanderTimer <= 0) {
@@ -514,6 +704,12 @@ export class Mob extends Entity {
     this.vx += (wx - this.vx) * accel;
     this.vz += (wz - this.vz) * accel;
     this.moving = true;
+
+    // rabbits and similar move in hops rather than a glide
+    if (this.def.hops && this.onGround && this.jumpCooldown <= 0) {
+      this.vy = 0.30;
+      this.jumpCooldown = 10 + this.rng.int(6);
+    }
 
     // obstacle handling: climb (spiders), jump, or avoid a drop
     const ax = Math.sign(wx), az = Math.sign(wz);
@@ -555,6 +751,14 @@ export class Mob extends Entity {
   damage(amount, source) {
     const ok = super.damage(amount, source);
     if (ok) {
+      // a tamed wolf's pack answers whatever hurt its owner
+      if (source && source !== this) {
+        for (const e of this.world.entities) {
+          if (e.dead || !(e instanceof Mob) || !e.tamed || !e.def.packHunter) continue;
+          if ((e.x - this.x) ** 2 + (e.z - this.z) ** 2 > 400) continue;
+          if (source instanceof Mob) e.attackTarget = source;
+        }
+      }
       this.aggro = 300;
       this.world.game.audio.play('mob_hurt');
       if (!this.hostile) {
@@ -610,6 +814,36 @@ export class Mob extends Entity {
       if (left) this.world.game.dropItemAt(player.x, player.y + 1, player.z, left, false);
       return true;
     }
+    if (this.def.trades) {
+      this.world.game.openTrades(this);
+      return true;
+    }
+    // taming: feed the right item until it takes
+    if (this.def.tameable && !this.tamed && it.name === this.def.tameable) {
+      player.inventory.consumeHeld(1);
+      if (this.rng.chance(0.34)) {
+        this.tamed = true;
+        this.owner = player;
+        this.persistent = true;
+        this.world.game.spawnParticles(this.x, this.y + this.height, this.z, 12, 0xff5588);
+        this.world.game.toast(this.def.rideable ? 'The horse is tamed. Right-click to ride.' : 'Tamed!');
+      } else {
+        this.world.game.spawnParticles(this.x, this.y + this.height, this.z, 8, 0x888888);
+      }
+      return true;
+    }
+    // a tamed horse can be ridden
+    if (this.def.rideable && this.tamed && !player.riding) {
+      this.rider = player;
+      player.riding = this;
+      return true;
+    }
+    if (this.tamed && this.def.packHunter) {
+      this.sitting = !this.sitting;
+      this.world.game.toast(this.sitting ? 'The wolf sits.' : 'The wolf follows.');
+      return true;
+    }
+
     if (this.def.food && this.def.food.includes(it.name) && this.loveTimer <= 0 && !this.baby) {
       player.inventory.consumeHeld(1);
       this.loveTimer = 600;

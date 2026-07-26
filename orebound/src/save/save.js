@@ -20,7 +20,7 @@ import { Inventory } from '../items/inventory.js';
 import { Mob, ItemEntity, Arrow, FallingBlock, Boat } from '../entities/entities.js';
 
 const MAGIC = 0x4f524542;   // "OREB"
-const VERSION = 3;
+const VERSION = 4;
 const DB_NAME = 'orebound';
 const STORE = 'saves';
 
@@ -399,7 +399,7 @@ function readContainer(r, mapItem) {
   return out;
 }
 
-const BE_TYPES = ['chest', 'furnace', 'sign', 'spawner'];
+const BE_TYPES = ['chest', 'furnace', 'sign', 'spawner', 'villager_spawn'];
 function writeBlockEntity(w, be) {
   w.i32w(be.x); w.i32w(be.y); w.i32w(be.z);
   w.u8w(Math.max(0, BE_TYPES.indexOf(be.type)));
@@ -454,6 +454,12 @@ function writeEntity(w, e) {
   else {
     w.boolw(!!e.baby); w.boolw(!!e.sheared); w.u8w(e.woolColor | 0);
     w.u16w(e.loveTimer | 0); w.boolw(!!e.persistent);
+    w.boolw(!!e.tamed);
+    w.strw(e.profession || '');
+    const uses = e.tradeUses || {};
+    const keys = Object.keys(uses);
+    w.u8w(keys.length);
+    for (const k of keys) { w.u8w(+k); w.u8w(uses[k]); }
   }
 }
 
@@ -470,6 +476,11 @@ function readEntity(r, mapItem) {
   else {
     e.baby = r.boolr(); e.sheared = r.boolr(); e.woolColor = r.u8r();
     e.loveTimer = r.u16r(); e.persistent = r.boolr();
+    e.tamed = r.boolr();
+    e.profession = r.strr() || null;
+    const n = r.u8r();
+    e.tradeUses = {};
+    for (let i = 0; i < n; i++) { const k = r.u8r(); e.tradeUses[k] = r.u8r(); }
   }
   return e;
 }
@@ -500,6 +511,9 @@ function buildEntity(world, e) {
   mob.health = Math.min(e.health, mob.maxHealth);
   mob.baby = e.baby; mob.sheared = e.sheared; mob.woolColor = e.woolColor;
   mob.loveTimer = e.loveTimer; mob.persistent = e.persistent;
+  mob.tamed = !!e.tamed;
+  if (e.profession) mob.profession = e.profession;
+  if (e.tradeUses) mob.tradeUses = e.tradeUses;
   if (mob.baby) { mob.width *= 0.55; mob.height *= 0.55; }
   return mob;
 }

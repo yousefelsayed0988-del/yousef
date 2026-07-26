@@ -266,6 +266,7 @@ smelt('beef', 'cooked_beef');
 smelt('porkchop', 'cooked_porkchop');
 smelt('chicken', 'cooked_chicken');
 smelt('mutton', 'cooked_mutton');
+smelt('rabbit', 'cooked_rabbit');
 smelt('potato', 'baked_potato');
 for (const w of woods) { smelt(`${w}_log`, 'charcoal'); smelt(`${w}_wood`, 'charcoal'); }
 

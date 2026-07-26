@@ -11,6 +11,7 @@ import { ITEMS, item, itemByName, maxDurability } from '../core/items.js';
 import { itemIconURL } from '../render/textures.js';
 import { Container, CraftingGrid, mkStack, sameItem, copyStack, ARMOR_START, OFFHAND, HOTBAR, MAIN } from '../items/inventory.js';
 import { fuelTicks, smeltResult } from '../core/recipes.js';
+import { tradesFor, canAfford, doTrade, usesLeft } from '../entities/trades.js';
 
 const el = (tag, cls, parent) => {
   const e = document.createElement(tag);
@@ -593,6 +594,60 @@ export class GameUI {
         const cookTotal = be.cookTotal || 200;
         this.progFill.style.width = Math.max(0, Math.min(1, be.cook / cookTotal)) * 100 + '%';
       };
+    });
+  }
+
+  // -------------------------------------------------------------- trading
+  openTrades(mob) {
+    const inv = this.game.player.inventory;
+    const offers = tradesFor(mob.profession);
+    this.open('trade', (p) => {
+      el('h2', null, p).textContent = 'Trade — ' +
+        mob.profession.charAt(0).toUpperCase() + mob.profession.slice(1);
+      const list = el('div', 'trade-list', p);
+
+      const rows = offers.map((offer) => {
+        const row = el('div', 'trade-row', list);
+        const give = el('div', 'trade-side', row);
+        for (const g of offer.give) {
+          const cell = el('div', 'trade-item', give);
+          const it = item(g.id);
+          el('div', 'trade-icon', cell).style.backgroundImage = `url(${itemIconURL(it, this.atlas)})`;
+          el('span', null, cell).textContent = `${g.count} ${it.display}`;
+        }
+        el('div', 'trade-arrow', row).textContent = '→';
+        const get = el('div', 'trade-side', row);
+        const cell = el('div', 'trade-item', get);
+        const gi = item(offer.get.id);
+        el('div', 'trade-icon', cell).style.backgroundImage = `url(${itemIconURL(gi, this.atlas)})`;
+        el('span', null, cell).textContent = `${offer.get.count} ${gi.display}`;
+        const btn = el('button', 'trade-btn', row);
+        btn.textContent = 'Trade';
+        btn.addEventListener('click', () => {
+          if (doTrade(inv, mob, offer, s2 => this.game.dropItemFromPlayer(s2))) {
+            this.game.audio.play('craft');
+            refresh();
+          } else {
+            this.toast(canAfford(inv, offer) ? 'That trade is sold out.' : 'You cannot afford that.');
+          }
+        });
+        return { offer, row, btn };
+      });
+
+      const refresh = () => {
+        for (const r of rows) {
+          const left = usesLeft(mob, r.offer);
+          const ok = left > 0 && canAfford(inv, r.offer);
+          r.btn.disabled = !ok;
+          r.row.classList.toggle('unavailable', !ok);
+          r.btn.textContent = left > 0 ? 'Trade' : 'Sold out';
+        }
+      };
+      refresh();
+      this.onRefresh = refresh;
+
+      el('div', 'sep', p);
+      this._playerSlots(p);
     });
   }
 

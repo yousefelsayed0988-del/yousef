@@ -108,6 +108,13 @@ export const MOB_LOOT = {
   skeleton: rng => [D('bone', rng.int(3)), D('arrow', rng.int(3))],
   creeper: rng => [D('gunpowder', rng.int(3))],
   spider:  rng => [D('string', rng.int(3)), rng.chance(0.33) ? D('spider_eye') : null],
+  rabbit:  rng => [D('rabbit', rng.chance(0.75) ? 1 : 0), D('leather', rng.int(2))],
+  wolf:    () => [],
+  fox:     () => [],
+  horse:   rng => [D('leather', rng.int(3))],
+  squid:   rng => [D('ink_sac', 1 + rng.int(3))],
+  bat:     () => [],
+  villager: rng => [rng.chance(0.35) ? D('emerald') : null],
 };
 
 export function mobDrops(type, rng) {
