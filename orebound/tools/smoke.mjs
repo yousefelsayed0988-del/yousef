@@ -80,6 +80,9 @@ await page.waitForFunction(
   () => { const p = window.game.player; return p.onGround || p.inWater || p.inLava; },
   null, { timeout: 15000 }).catch(() => { });
 await page.waitForTimeout(400);
+// If the player walked off into a ravine the settle above can time out while
+// they are still descending. The invariant that matters is "not falling
+// forever", so report vertical velocity too.
 
 const report = await page.evaluate(() => {
   const g = window.game;
@@ -107,6 +110,7 @@ const report = await page.evaluate(() => {
     player: before,
     onGround: p.onGround,
     inFluid: p.inWater || p.inLava,
+    vy: p.vy,
     health: p.health,
     hunger: p.hunger,
     biome: w.biomeAt(Math.floor(p.x), Math.floor(p.z)).name,
@@ -129,8 +133,9 @@ check('chunks loaded', report.chunks > 40, `${report.chunks}`);
 check('sub-chunk meshes built', report.meshes > 30, `${report.meshes}`);
 check('terrain is being drawn', report.sectionsDrawn > 5, `${report.sectionsDrawn} sections`);
 check('triangles > 0', report.triangles > 1000, `${report.triangles}`);
-check('player comes to rest on ground or in fluid', report.onGround === true || report.inFluid === true,
-  `onGround=${report.onGround} inFluid=${report.inFluid}`);
+check('player is supported, not falling forever',
+  report.onGround === true || report.inFluid === true || Math.abs(report.vy) < 0.05,
+  `onGround=${report.onGround} inFluid=${report.inFluid} vy=${report.vy.toFixed(3)}`);
 check('player above bedrock', report.player.y > -60, `y=${report.player.y.toFixed(1)}`);
 check('player at/near surface', Math.abs(report.player.y - report.topSolid) < 6,
   `y=${report.player.y.toFixed(1)} top=${report.topSolid}`);

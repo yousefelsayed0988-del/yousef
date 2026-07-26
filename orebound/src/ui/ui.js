@@ -94,7 +94,6 @@ export class GameUI {
     }
     this.itemName = el('div', 'item-name', this.hud);
 
-    this.heldView = el('div', 'held-item', this.hud);
 
     this.toastBox = el('div', 'toasts', r);
     this.debug = el('div', 'debug', r);
@@ -182,18 +181,6 @@ export class GameUI {
       if (it) this.itemName.classList.add('show');
     }
 
-    // first-person held item corner view
-    const held = inv.held;
-    const hk = held ? held.id : 0;
-    if (this._heldKey !== hk) {
-      this._heldKey = hk;
-      this.heldView.style.backgroundImage = held ? `url(${itemIconURL(item(held.id), this.atlas)})` : '';
-    }
-    const swing = this.game.player.swingTime;
-    const bob = Math.sin(this.game.player.bobPhase) * (CONFIG.viewBobbing ? 6 : 0);
-    const sw = swing > 0 ? Math.sin((6 - swing) / 6 * Math.PI) * 40 : 0;
-    this.heldView.style.transform = `translate(${bob - sw * 0.5}px, ${-Math.abs(bob) * 0.6 + sw}px) rotate(${-sw * 0.6}deg)`;
-
     this.damageFlash.style.opacity = p.hurtFlash > 0 ? (p.hurtFlash / 8) * 0.45 : 0;
     const lowHealth = p.health <= 6 && p.health > 0;
     this.vignette.classList.toggle('low', lowHealth);
@@ -212,6 +199,16 @@ export class GameUI {
       if (kids[i]._state !== cls) { kids[i]._state = cls; kids[i].className = kind + ' ' + cls; }
     }
     row.classList.toggle('flash', !!flash);
+  }
+
+  /** Crosshair kick on each crack stage -- cheap, but it sells the impact. */
+  pulseCrosshair(progress) {
+    const c = this.crosshair;
+    c.style.transform = `translate(-50%, -50%) scale(${1 + 0.22 + progress * 0.3})`;
+    clearTimeout(this._chTimer);
+    this._chTimer = setTimeout(() => {
+      c.style.transform = 'translate(-50%, -50%) scale(1)';
+    }, 70);
   }
 
   toast(msg, ms = 2600) {

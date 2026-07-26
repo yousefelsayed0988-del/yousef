@@ -108,11 +108,13 @@ export class Audio {
 
   material(def) { return MATERIAL[def && def.sound ? def.sound : 'stone'] || MATERIAL.stone; }
 
-  dig(def) {
-    if (!this.throttle('dig', 130)) return;
+  /** `progress` 0..1 lifts the pitch as the block gives way. */
+  dig(def, progress = 0) {
+    if (!this.throttle('dig', 110)) return;
     const m = this.material(def);
-    if (m.type === 'tone') this.tone(m.freq * (0.9 + Math.random() * 0.2), m.decay, m.gain * 0.35, 'triangle');
-    else this.noise(m.freq * (0.85 + Math.random() * 0.3), m.q, m.decay * 0.7, m.gain * 0.4);
+    const rise = 1 + progress * 0.55;
+    if (m.type === 'tone') this.tone(m.freq * rise * (0.9 + Math.random() * 0.2), m.decay, m.gain * 0.35, 'triangle');
+    else this.noise(m.freq * rise * (0.85 + Math.random() * 0.3), m.q, m.decay * 0.7, m.gain * (0.32 + progress * 0.2));
   }
 
   break(def) {

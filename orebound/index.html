@@ -65,6 +65,7 @@
   .crosshair {
     position: absolute; left: 50%; top: 50%; width: 18px; height: 18px;
     transform: translate(-50%, -50%); mix-blend-mode: difference;
+    transition: transform .07s ease-out;
   }
   .crosshair::before, .crosshair::after {
     content: ""; position: absolute; background: #fff;
@@ -138,13 +139,6 @@
   }
   .item-name.show { opacity: 1; animation: fadeName 2.4s forwards; }
   @keyframes fadeName { 0%,60% { opacity: 1; } 100% { opacity: 0; } }
-
-  .held-item {
-    position: absolute; right: 6%; bottom: 4%; width: 148px; height: 148px;
-    background-size: contain; background-repeat: no-repeat; background-position: bottom right;
-    image-rendering: pixelated; filter: drop-shadow(0 8px 14px rgba(0,0,0,.6));
-    transition: none; pointer-events: none;
-  }
 
   .vignette {
     position: absolute; inset: 0; pointer-events: none;

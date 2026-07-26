@@ -516,12 +516,25 @@ export class Renderer {
     gl.disable(gl.POLYGON_OFFSET_FILL);
   }
 
-  /** 10-stage crack overlay on the block being mined. */
-  drawCrack(x, y, z, stage, boxes) {
+  /**
+   * 10-stage crack overlay on the block being mined.
+   *
+   * `progress` (0..1) also drives a small strain pulse: the overlay swells and
+   * shudders slightly as the block nears failure. It is the overlay that moves,
+   * not the block -- the block itself lives in a static chunk mesh -- but at
+   * these amplitudes it reads as the block straining under the tool.
+   */
+  drawCrack(x, y, z, stage, boxes, progress = 0, time = 0) {
     if (stage < 0) return;
     const gl = this.gl;
     const layer = this.atlas.layerOf.get('crack_' + Math.min(9, stage));
     if (layer === undefined) return;
+    const strain = progress * progress;
+    const swell = 0.004 + strain * 0.02;
+    const shudder = strain * 0.012;
+    const jx = Math.sin(time * 47) * shudder;
+    const jy = Math.sin(time * 41 + 1.7) * shudder;
+    const jz = Math.cos(time * 53 + 0.9) * shudder;
     let n = 0;
     const D = this.ovData;
     const push = (px, py, pz, u, v) => {
@@ -536,14 +549,14 @@ export class Renderer {
       [[1, 1, 1], [0, 1, 1], [0, 0, 1], [1, 0, 1]],
     ];
     const UV = [[0, 0], [1, 0], [1, 1], [0, 1]];
-    const eps = 0.002;
+    const eps = swell;
     for (const b of boxes) {
       for (let f = 0; f < 6; f++) {
         const vs = FV[f];
         const pts = vs.map(cv => [
-          x + (cv[0] ? b[3] : b[0]) + (cv[0] ? eps : -eps),
-          y + (cv[1] ? b[4] : b[1]) + (cv[1] ? eps : -eps),
-          z + (cv[2] ? b[5] : b[2]) + (cv[2] ? eps : -eps),
+          x + jx + (cv[0] ? b[3] : b[0]) + (cv[0] ? eps : -eps),
+          y + jy + (cv[1] ? b[4] : b[1]) + (cv[1] ? eps : -eps),
+          z + jz + (cv[2] ? b[5] : b[2]) + (cv[2] ? eps : -eps),
         ]);
         if (n + 30 > D.length) break;
         push(pts[0][0], pts[0][1], pts[0][2], UV[0][0], UV[0][1]);
@@ -577,5 +590,93 @@ export class Renderer {
 
   visible(ox, oy, oz) {
     return aabbInFrustum(this.planes, ox, oy, oz, ox + 16, oy + 16, oz + 16);
+  }
+
+  /** Wipe depth so the view model can never be clipped by nearby geometry. */
+  clearDepth() {
+    this.gl.clear(this.gl.DEPTH_BUFFER_BIT);
+  }
+
+  // ------------------------------------------- textured view-model geometry
+  // Same vertex layout as terrain, but built per frame in world space, so the
+  // block in the player's hand samples the real texture array.
+  beginViewGeo() {
+    if (!this.viewGeo) {
+      const cap = 256;
+      const buf = new ArrayBuffer(cap * STRIDE);
+      this.viewGeo = {
+        cap, buf, f32: new Float32Array(buf), u8: new Uint8Array(buf), u16: new Uint16Array(buf),
+        n: 0, idx: new Uint32Array(cap * 3 / 2 | 0), ni: 0,
+      };
+      const gl = this.gl;
+      this.viewVAO = gl.createVertexArray();
+      this.viewVB = gl.createBuffer();
+      this.viewIB = gl.createBuffer();
+      gl.bindVertexArray(this.viewVAO);
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.viewVB);
+      gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, STRIDE, 0);
+      gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 2, gl.UNSIGNED_BYTE, true, STRIDE, 12);
+      gl.enableVertexAttribArray(2); gl.vertexAttribIPointer(2, 1, gl.UNSIGNED_SHORT, STRIDE, 14);
+      gl.enableVertexAttribArray(3); gl.vertexAttribIPointer(3, 4, gl.UNSIGNED_BYTE, STRIDE, 16);
+      gl.enableVertexAttribArray(4); gl.vertexAttribPointer(4, 4, gl.UNSIGNED_BYTE, true, STRIDE, 20);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.viewIB);
+      gl.bindVertexArray(null);
+    }
+    this.viewGeo.n = 0;
+    this.viewGeo.ni = 0;
+  }
+
+  pushViewQuad(p0, p1, p2, p3, layer, light, normal, tint) {
+    const V = this.viewGeo;
+    if (V.n + 4 > V.cap) return;
+    const l = Math.max(0, Math.min(15, Math.round(light * 15)));
+    const tr = (tint >> 16) & 255, tg = (tint >> 8) & 255, tb = tint & 255;
+    const uv = [[0, 0], [255, 0], [255, 255], [0, 255]];
+    const pts = [p0, p1, p2, p3];
+    for (let i = 0; i < 4; i++) {
+      const o = V.n * STRIDE, fo = o >> 2;
+      V.f32[fo] = pts[i][0]; V.f32[fo + 1] = pts[i][1]; V.f32[fo + 2] = pts[i][2];
+      V.u8[o + 12] = uv[i][0]; V.u8[o + 13] = uv[i][1];
+      V.u16[(o >> 1) + 7] = layer;
+      // hand geometry is lit uniformly: it is not part of the world grid
+      V.u8[o + 16] = l; V.u8[o + 17] = l; V.u8[o + 18] = 3; V.u8[o + 19] = normal;
+      V.u8[o + 20] = tr; V.u8[o + 21] = tg; V.u8[o + 22] = tb; V.u8[o + 23] = 0;
+      V.n++;
+    }
+    const b = V.n - 4;
+    V.idx[V.ni++] = b; V.idx[V.ni++] = b + 1; V.idx[V.ni++] = b + 2;
+    V.idx[V.ni++] = b; V.idx[V.ni++] = b + 2; V.idx[V.ni++] = b + 3;
+  }
+
+  flushViewGeo(env) {
+    const V = this.viewGeo;
+    if (!V || V.ni === 0) return;
+    const gl = this.gl;
+    const { p, u } = this.terrain;
+    gl.useProgram(p);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.texArray);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.maskArray);
+    gl.uniform1i(u.u_tex, 0);
+    gl.uniform1i(u.u_mask, 1);
+    gl.uniformMatrix4fv(u.u_viewProj, false, this.viewProj);
+    gl.uniform3fv(u.u_camPos, this.camPos);
+    gl.uniform1f(u.u_dayLight, 1.0);
+    gl.uniform1f(u.u_time, env.time);
+    gl.uniform3fv(u.u_fogColor, env.fogColor);
+    // fog must not touch the hand: it is centimetres from the camera
+    gl.uniform1f(u.u_fogStart, 1e9);
+    gl.uniform1f(u.u_fogEnd, 1e9 + 1);
+    gl.uniform1f(u.u_alphaTest, 0.35);
+    gl.uniform3f(u.u_chunkPos, 0, 0, 0);
+    gl.disable(gl.BLEND);
+    gl.bindVertexArray(this.viewVAO);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.viewVB);
+    gl.bufferData(gl.ARRAY_BUFFER, V.u8.subarray(0, V.n * STRIDE), gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.viewIB);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, V.idx.subarray(0, V.ni), gl.DYNAMIC_DRAW);
+    gl.drawElements(gl.TRIANGLES, V.ni, gl.UNSIGNED_INT, 0);
+    gl.bindVertexArray(null);
+    this.stats.drawCalls++;
+    V.ni = 0; V.n = 0;
   }
 }

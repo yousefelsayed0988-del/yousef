@@ -560,11 +560,16 @@ export class Player {
     }
     const { perTick } = this.breakSpeed(def);
     this.mining.progress += perTick;
+    this.mining.hitFace = t.face;
+    this.mining.hit = [t.px, t.py, t.pz];
     const stage = Math.min(9, Math.floor(this.mining.progress * 10));
     if (stage !== this.mining.stage) {
       this.mining.stage = stage;
-      this.game.audio.dig(def);
+      this.game.audio.dig(def, this.mining.progress);
+      this.game.onMiningProgress(t, def, this.mining.progress);
     }
+    // keep the arm swinging for as long as the button is held
+    if (this.swingTime <= 0) this.swingTime = 7;
     if (this.mining.progress >= 1) {
       this.breakBlock(t.x, t.y, t.z);
       this.mining = null;

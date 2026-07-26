@@ -682,30 +682,96 @@ function buildTileFor(key, cache) {
 }
 
 /**
- * Break progress overlay, stages 0..9. Each stage keeps the previous stage's
- * cracks and grows them, so the animation reads as one fracture spreading.
+ * Break progress overlay, stages 0..9.
+ *
+ * The whole fracture is generated once, with every pixel tagged by the stage it
+ * appears at; a given stage then draws only the pixels born at or before it.
+ * That guarantees the animation is strictly additive -- cracks grow and branch
+ * outward from one impact point, they never flicker or rearrange between
+ * frames, which is what a per-stage random pattern does.
  */
-function crackTile(stage) {
-  const t = new Tile();
-  t.clear();
-  const rng = new Random(0x5eed);
-  // fixed set of crack seeds; how many are drawn (and how long) scales with stage
-  const seeds = [];
-  for (let i = 0; i < 10; i++) seeds.push([rng.int(16), rng.int(16), rng.float() * Math.PI * 2]);
-  const active = 2 + stage;
-  for (let i = 0; i < Math.min(seeds.length, active); i++) {
-    const [sx, sy, ang0] = seeds[i];
-    let x = sx, y = sy, ang = ang0;
-    const len = 3 + stage + rng.int(3);
+const CRACK_FRAMES = (() => {
+  const STAGES = 10;
+  // birth[i] = stage at which this pixel first appears (99 = never)
+  const birth = new Uint8Array(TILE * TILE).fill(99);
+  const depth = new Float32Array(TILE * TILE);      // 1 = core crack, <1 = chip
+  const rng = new Random(0x5eed17);
+
+  const mark = (x, y, stage, d) => {
+    if (x < 0 || y < 0 || x >= TILE || y >= TILE) return;
+    const i = y * TILE + x;
+    if (stage < birth[i]) { birth[i] = stage; depth[i] = d; }
+    else if (stage === birth[i] && d > depth[i]) depth[i] = d;
+  };
+
+  // A crack branch: walks outward from (x,y), fading in over the stage range
+  // it spans, and spawning children partway along.
+  const branch = (x, y, ang, len, startStage, endStage, width, gen) => {
+    let cx = x, cy = y, a = ang;
     for (let k = 0; k < len; k++) {
-      t.set(x, y, 20, 20, 20, 210);
-      if (k % 2 === 0) t.set(x + 1, y, 30, 30, 30, 120);
-      ang += (rng.float() - 0.5) * 1.1;
-      x = (x + Math.round(Math.cos(ang)) + 16) % 16;
-      y = (y + Math.round(Math.sin(ang)) + 16) % 16;
+      const t = k / Math.max(1, len - 1);
+      const stage = Math.round(startStage + (endStage - startStage) * t);
+      mark(Math.round(cx), Math.round(cy), stage, 1);
+      // thicken the early part of the crack so it reads as an impact
+      if (width > 0.5 && k < len * 0.55) {
+        mark(Math.round(cx + Math.cos(a + Math.PI / 2)), Math.round(cy + Math.sin(a + Math.PI / 2)), stage, 0.55);
+      }
+      if (gen < 2 && k > 2 && rng.chance(0.22)) {
+        branch(cx, cy, a + (rng.chance(0.5) ? 1 : -1) * (0.5 + rng.float() * 0.7),
+          Math.round(len * (0.35 + rng.float() * 0.3)), stage, endStage, width * 0.5, gen + 1);
+      }
+      a += (rng.float() - 0.5) * 0.75;
+      cx += Math.cos(a); cy += Math.sin(a);
+      if (cx < -1 || cy < -1 || cx > TILE || cy > TILE) break;
     }
+  };
+
+  // impact point, slightly off-centre so it does not look like a target
+  const ox = 7 + rng.int(3) - 1, oy = 7 + rng.int(3) - 1;
+  mark(ox, oy, 0, 1);
+  // Spokes are evenly distributed with only slight jitter: letting the angles
+  // be fully random leaves whole quadrants of the face untouched, which reads
+  // as a smudge in one corner rather than a block about to give way.
+  const spokes = 7;
+  for (let i = 0; i < spokes; i++) {
+    const a = (i / spokes) * Math.PI * 2 + (rng.float() - 0.5) * 0.5;
+    branch(ox, oy, a, 12 + rng.int(6), 0, 6 + rng.int(3), 1, 0);
   }
-  return t;
+  // late-stage secondary fractures out at the corners, so stages 7-9 keep
+  // visibly progressing instead of stalling
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 + (rng.float() - 0.5) * 0.6;
+    const r = 4 + rng.int(3);
+    branch(ox + Math.cos(a) * r, oy + Math.sin(a) * r, a + (rng.chance(0.5) ? 1.4 : -1.4),
+      6 + rng.int(5), 6 + rng.int(2), 9, 0.6, 1);
+  }
+  // spalling: flakes lifting off around the impact in the final stages
+  for (let i = 0; i < 26; i++) {
+    const a = rng.float() * Math.PI * 2, r = rng.float() * 5.5;
+    mark(Math.round(ox + Math.cos(a) * r), Math.round(oy + Math.sin(a) * r), 7 + rng.int(3), 0.32);
+  }
+
+  const frames = [];
+  for (let s = 0; s < STAGES; s++) {
+    const t = new Tile();
+    t.clear();
+    for (let i = 0; i < TILE * TILE; i++) {
+      if (birth[i] > s) continue;
+      const age = s - birth[i];
+      const d = depth[i];
+      // cracks darken and widen as they age, so the surface reads as
+      // progressively more damaged rather than just more covered
+      const dark = d > 0.5 ? 12 : 40;
+      const alpha = Math.min(255, (d > 0.5 ? 170 : 90) + age * 14 + d * 40);
+      t.set(i % TILE, (i / TILE) | 0, dark, dark, dark + 2, alpha, 0);
+    }
+    frames.push(t);
+  }
+  return frames;
+})();
+
+function crackTile(stage) {
+  return CRACK_FRAMES[Math.max(0, Math.min(9, stage))];
 }
 
 /**

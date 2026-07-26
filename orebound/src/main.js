@@ -11,6 +11,7 @@ import { parseSeed, Random } from './core/rng.js';
 import { buildAtlas, buildMeshTables, itemIconURL } from './render/textures.js';
 import { averageTileColor, drawMob, drawItemEntity, drawArrow, drawFallingBlock, drawBoat, drawTNT } from './render/entitymodels.js';
 import { Renderer } from './render/renderer.js';
+import { ViewModel } from './render/viewmodel.js';
 import { World } from './world/world.js';
 import { FluidSim } from './world/fluids.js';
 import { RandomTicker } from './world/randomtick.js';
@@ -55,6 +56,7 @@ class Game {
     this.camPos = [0, 0, 0];
     this.itemColors = new Map();
     this._precomputeItemColors();
+    this.viewModel = new ViewModel(this);
 
     window.addEventListener('resize', () => this.renderer.resize());
     this.renderer.resize();
@@ -246,6 +248,7 @@ class Game {
     this.render(alpha, dt);
     this.perf.render = this.perf.render * 0.9 + (performance.now() - tRender) * 0.1;
     this.perf.frame = this.perf.frame * 0.9 + (performance.now() - tFrame) * 0.1;
+    if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 3.2);
     if (this.ui.isOpen) this.ui.refresh();
     this.ui.updateHUD();
     if (this.debugVisible) this.ui.updateDebug(this.debugText());
@@ -467,9 +470,14 @@ class Game {
 
   onBlockBroken(x, y, z, def, drops) {
     this.audio.break(def);
-    const key = (def.tex && (def.tex.top || def.tex.all || def.tex.side)) || null;
-    const tile = key ? this.atlas.tiles.get(key) : null;
-    this.spawnParticles(x + 0.5, y + 0.5, z + 0.5, 14, averageTileColor(tile));
+    const color = this.blockParticleColor(def);
+    // a dense core burst plus a slower outward puff reads as the block
+    // shattering rather than as a single symmetric pop
+    this.spawnParticles(x + 0.5, y + 0.5, z + 0.5, 26, color,
+      { spread: 0.85, speed: 0.15, life: 16, size: 0.05 });
+    this.spawnParticles(x + 0.5, y + 0.5, z + 0.5, 12, mixColor(color, 0x000000, 0.35),
+      { spread: 1.0, speed: 0.06, life: 26, size: 0.028 });
+    this.shake = Math.min(0.8, (this.shake || 0) + 0.28);
     for (const d of drops) {
       this.dropItemAt(x + 0.5, y + 0.25, z + 0.5, mkStack(d.id, d.count), false);
     }
@@ -530,20 +538,56 @@ class Game {
     this.world.entities.push(new Arrow(this.world, x, y, z, dx, dy, dz, speed, owner));
   }
 
-  spawnParticles(x, y, z, n, color) {
+  spawnParticles(x, y, z, n, color, opts = {}) {
+    const spread = opts.spread ?? 0.7;
+    const speed = opts.speed ?? 0.11;
+    const dir = opts.dir;
     for (let i = 0; i < n; i++) {
+      let vx = (Math.random() - 0.5) * speed;
+      let vy = Math.random() * speed * 1.3;
+      let vz = (Math.random() - 0.5) * speed;
+      if (dir) {
+        // bias the spray out along the struck face
+        vx += dir[0] * speed * (0.8 + Math.random());
+        vy += dir[1] * speed * (0.8 + Math.random());
+        vz += dir[2] * speed * (0.8 + Math.random());
+      }
       this.particles.push({
-        x: x + (Math.random() - 0.5) * 0.7,
-        y: y + (Math.random() - 0.5) * 0.7,
-        z: z + (Math.random() - 0.5) * 0.7,
-        vx: (Math.random() - 0.5) * 0.11,
-        vy: Math.random() * 0.14,
-        vz: (Math.random() - 0.5) * 0.11,
-        life: 18 + Math.floor(Math.random() * 22),
-        size: 0.045 + Math.random() * 0.045,
+        x: x + (Math.random() - 0.5) * spread,
+        y: y + (Math.random() - 0.5) * spread,
+        z: z + (Math.random() - 0.5) * spread,
+        vx, vy, vz,
+        life: (opts.life ?? 18) + Math.floor(Math.random() * 22),
+        size: (opts.size ?? 0.045) + Math.random() * 0.045,
         color,
       });
     }
+  }
+
+  /** Colour to spray when a given block is struck. */
+  blockParticleColor(def) {
+    const key = (def.tex && (def.tex.side || def.tex.all || def.tex.top)) || null;
+    let c = averageTileColor(key ? this.atlas.tiles.get(key) : null);
+    if (def.tint === 'grass') c = mixColor(c, 0x79c05a, 0.7);
+    if (def.tint === 'foliage') c = mixColor(c, 0x59ae30, 0.7);
+    return c;
+  }
+
+  /**
+   * Called on every crack stage. Chips fly off the struck face, the crosshair
+   * pulses, and the camera picks up a small kick -- the block should feel like
+   * it is being worked, not silently ticking a progress bar.
+   */
+  onMiningProgress(target, def, progress) {
+    const n = FACE_NORMALS[target.face] || [0, 1, 0];
+    const color = this.blockParticleColor(def);
+    const count = 2 + Math.round(progress * 4);
+    this.spawnParticles(
+      target.px + n[0] * 0.06, target.py + n[1] * 0.06, target.pz + n[2] * 0.06,
+      count, color,
+      { spread: 0.22, speed: 0.05 + progress * 0.06, dir: n, life: 10, size: 0.022 });
+    this.shake = Math.min(0.5, (this.shake || 0) + 0.06 + progress * 0.10);
+    this.ui.pulseCrosshair(progress);
   }
 
   explode(x, y, z, radius) {
@@ -696,6 +740,13 @@ class Game {
       this.camPos[1] += Math.sin(p.bobPhase * 2) * 0.028;
       this.camPos[0] += Math.cos(p.bobPhase) * 0.012 * Math.sin(p.yaw + Math.PI / 2);
     }
+    if (this.shake > 0) {
+      const s = this.shake * this.shake * 0.09;
+      const t = performance.now() * 0.001;
+      this.camPos[0] += Math.sin(t * 63) * s;
+      this.camPos[1] += Math.sin(t * 71 + 2.1) * s;
+      this.camPos[2] += Math.cos(t * 57 + 1.3) * s;
+    }
     let fov = CONFIG.fov;
     if (p.sprinting) fov *= 1.07;
     if (p.bowCharge > 0) fov *= 1 - Math.min(0.18, p.bowCharge / 20 * 0.18);
@@ -747,11 +798,15 @@ class Game {
         if (boxes) {
           r.drawSelection(t.x, t.y, t.z, boxes);
           if (p.mining && p.mining.x === t.x && p.mining.y === t.y && p.mining.z === t.z) {
-            r.drawCrack(t.x, t.y, t.z, Math.min(9, Math.floor(p.mining.progress * 10)), boxes);
+            r.drawCrack(t.x, t.y, t.z, Math.min(9, Math.floor(p.mining.progress * 10)),
+              boxes, Math.min(1, p.mining.progress), performance.now() * 0.001);
           }
         }
       }
     }
+
+    // the hand goes last, on a cleared depth buffer
+    if (!this.ui.isOpen) this.viewModel.draw(r, this.camPos, p.yaw, p.pitch, env, alpha);
 
     this.ui.fluidOverlay.style.opacity = this.underwater ? 0.42 : (this.inLavaView ? 0.85 : 0);
     this.ui.fluidOverlay.style.background = this.inLavaView ? '#c8400a' : '#2b5ea8';
@@ -822,6 +877,8 @@ class Game {
     return lines.join('\n');
   }
 }
+
+const FACE_NORMALS = [[-1, 0, 0], [1, 0, 0], [0, -1, 0], [0, 1, 0], [0, 0, -1], [0, 0, 1]];
 
 function r0(n) { return Math.round(n).toLocaleString(); }
 function toVec(c) {
