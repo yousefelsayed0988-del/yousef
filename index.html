@@ -9739,11 +9739,27 @@ function eachDrawable(cb){
     for (const part of mdl) cb(part.mesh, itemMat, part.tex, part.glow);
   }
 
-  // the Lodger
+  /* The Lodger.
+
+     His eye sockets are the only part of him that makes its own light, and
+     they were a flat constant - two orange dots that never did anything. A
+     coal is not constant: it dims when he is idle and it comes up when he
+     has you, it gutters, and it all but goes out while he is down. Driving
+     the glow gives the bloom chain something to catch, so the sockets bleed
+     across the frame the way they should. */
   if (V.active && V.bones){
+    const t = performance.now() / 1000;
+    let ember = 1.35 + (V.rage || 0) * 1.5;
+    if (V.state === 'hunt' || V.state === 'lunge') ember += 1.6;
+    else if (V.state === 'roar') ember += 3.2;
+    else if (V.state === 'stalk' || V.state === 'investigate') ember += 0.7;
+    if (V.stun > 0) ember *= 0.22;
+    // guttering: two beats out of phase so they never look painted on
+    ember *= 0.86 + Math.sin(t * 3.1) * 0.09 + Math.sin(t * 11.7) * 0.05;
     for (const n in V.bones){
       const b = V.bones[n];
-      for (const part of b.gpu) cb(part.mesh, b.world, part.tex, part.glow);
+      for (const part of b.gpu)
+        cb(part.mesh, b.world, part.tex, part.tex === 'emberEye' ? part.glow * ember : part.glow);
     }
   }
 }
