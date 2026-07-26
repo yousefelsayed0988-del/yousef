@@ -649,6 +649,46 @@ function buildTextures(){
 }
 
 /* ---------------- story fragments ---------------- */
+/* Six pages that say who the thing on the landing used to be. */
+const LEDGER = [
+  { t:'Rent book, first page', m:'Hollowmere House, November 1973',
+    b:['Attic room let this day. One year paid forward in coin, counted twice on the table because I did not believe the first count.',
+       'He would not give a name for the book. I have written GENTLEMAN, ATTIC, and left the rest of the line empty, which I have never done in eleven years of keeping it.'] },
+  { t:"Physician's note", m:'Dr A. Merrick, called out 14 February',
+    b:["Attended the attic at the landlady's request. The lodger declined to be examined and spoke to me through the door, which he did not open.",
+       'What I could see of the hand at the sill was burned, and the burn was old. Not a recent injury. He asked me one question only, whether skin of that age still takes light badly, and I said I did not know what he meant by it.'] },
+  { t:'Inventory of the attic room', m:'Taken the week after the fire',
+    b:['One iron bedstead, never slept in. One chair, drawn up to the window and facing out. Forty-one candle stubs burned down into their holders.',
+       'No clothing. No papers but these. No mirror, and four screw holes in the plaster where a mirror had been taken down and not replaced.'] },
+  { t:"Coroner's minute", m:'Ravenglass County, 9 April',
+    b:['Six of the household accounted for at the roadside. The seventh, the lodger of the attic room, is entered as missing and not as deceased, there being nothing to enter him as.',
+       'No remains were recovered. The attic door was found bolted on the landing side. The matter is left open, which I am told is unusual, and I have said so twice for the record.'] },
+  { t:'Loose page, written both sides', m:'One hand throughout',
+    b:['I WILL NOT BE LOOKED AT. I WILL NOT BE LOOKED AT. I WILL NOT BE LOOKED AT. I WILL NOT BE LOOKED AT. I WILL NOT BE LOOKED AT.',
+       'The line runs on for four hundred and some, the letters shrinking as the margin closes on them, and the last of them are pressed hard enough to open the paper.'] },
+  { t:'The last page', m:'A different hand, recent',
+    b:['I have read all of this twice looking for the day he stopped being a man and started being the thing on the landing, and it is not the fire. The fire only took the roof off him.',
+       'It is the year before, when this house learned to let him alone. Do not do that. Look at him, and keep looking. It is the one thing he has never once been able to stand.'] },
+{ t:'Ledger page, Jan 1974', m:'Hollowmere House, rooms let by the week',
+    b:['Attic room. One year in advance, paid in coin, counted twice because I did not believe it the first time.',
+       'He signs the book E. Marrow and will not give a Christian name. He is thirty or he is fifty. I could not swear to it in front of anyone.'] },
+  { t:'Ledger page, March', m:'Written in a different hand',
+    b:['He asks for no linen, no fire, no lamp. He asks only that the door at the foot of the attic stair be left unbolted at night.',
+       'Mrs Hale left us on the 9th. She would not say why. She would only say that he had been very kind to her, and she said it the way you would report a burn.'] },
+  { t:'Ledger page, June', m:'Ink run at the edges',
+    b:['The lodger came down to the kitchen tonight and sat with us an hour and I cannot recall one word of it. Only that we all laughed, and that afterwards nobody could sleep.',
+       'My husband says the man has a face out of a painting. I say a painting is a thing somebody made on purpose, out of a want.'] },
+  { t:'Ledger page, September', m:'Half the page torn away',
+    b:['Three rooms empty now and the rents still coming in coin under the door on a Friday. I have stopped asking where from.',
+       'He does not sleep. He stands. I have watched the strip of light under his door from midnight to four and it never once broke.'] },
+  { t:'Ledger page, November', m:'Hand unsteady',
+    b:['We bolted the attic door from the outside tonight, my husband and I, and neither of us has said a word about it since.',
+       'He knocked twice. Not loud. The way a guest knocks. Then he waited, and he is waiting still, and I think he can wait longer than a house can stand.'] },
+  { t:'Last page', m:'Loose in the back of the book',
+    b:['If the fire takes this room take the book with it. Whoever counts the dead afterwards, count him.',
+       'He was somebody once. That is the whole of it. Somebody sat where you are sitting and wrote his name in a book, and the house kept the book and let the man go.'] }
+];
+
 const NOTES = [
   { t:'Letter, unsent', m:'Elias, to you, never posted',
     b:['The wiring is fine. I tested every run twice. It is the house that keeps switching itself on.',
@@ -909,7 +949,22 @@ function generateLevel(seed){
   // --- items
   const pool = rooms.slice(1).filter(r => r !== boxRoom);
   const spots = [];
-  for (const r of pool) for (let k=0;k<3;k++) spots.push({ x: r.x + ri(0,r.w-1) + 0.5, y: r.y + ri(0,r.h-1) + 0.5, room:r });
+  const spotCells = new Set();
+  const addSpot = (r) => {
+    for (let tries = 0; tries < 24; tries++){
+      const cx = r.x + ri(0,r.w-1), cy = r.y + ri(0,r.h-1);
+      const k = cy*MW + cx;
+      if (spotCells.has(k)) continue;
+      spotCells.add(k);
+      spots.push({ x: cx + 0.5, y: cy + 0.5, room:r });
+      return true;
+    }
+    return false;
+  };
+  for (const r of pool) for (let k=0;k<10;k++) addSpot(r);
+  // a thin house can still leave the roster short a floor; walk the rooms again
+  for (let guard2 = 0; spots.length < 80 && pool.length && guard2 < 400; guard2++)
+    addSpot(pool[guard2 % pool.length]);
   for (let i=spots.length-1;i>0;i--){ const j = ri(0,i); const t = spots[i]; spots[i] = spots[j]; spots[j] = t; }
 
   let si = 0;
@@ -931,6 +986,34 @@ function generateLevel(seed){
     items.push({ type: tool, x:p.x, y:p.y, live:true, bob: rng()*6.28 });
   }
   for (let i=0;i<2;i++){ const p = take(); items.push({ type:'medkit', x:p.x, y:p.y, live:true, bob: rng()*6.28 }); }
+
+  /* ---- thrown and placed: the only honest answer to a thing that hunts
+     by ear. A bottle sends him somewhere. A flare keeps him off. A music
+     box buys you the six seconds it takes him to break it. ---- */
+  for (let i=0;i<5;i++){ const p = take(); items.push({ type:'bottle',   x:p.x, y:p.y, live:true, bob: rng()*6.28 }); }
+  for (let i=0;i<3;i++){ const p = take(); items.push({ type:'flare',    x:p.x, y:p.y, live:true, bob: rng()*6.28 }); }
+  for (let i=0;i<2;i++){ const p = take(); items.push({ type:'musicbox', x:p.x, y:p.y, live:true, bob: rng()*6.28 }); }
+
+  /* ---- what you put into yourself. Bleeding leaves him a trail. ---- */
+  for (let i=0;i<3;i++){ const p = take(); items.push({ type:'bandage',    x:p.x, y:p.y, live:true, bob: rng()*6.28 }); }
+  for (let i=0;i<2;i++){ const p = take(); items.push({ type:'adrenaline', x:p.x, y:p.y, live:true, bob: rng()*6.28 }); }
+  for (let i=0;i<2;i++){ const p = take(); items.push({ type:'laudanum',   x:p.x, y:p.y, live:true, bob: rng()*6.28 }); }
+
+  /* ---- the quiet arms. A nail gun barely carries past the next room and
+     a plate camera makes no sound at all, only light. ---- */
+  { const p = take(); items.push({ type:'nailgun', x:p.x, y:p.y, live:true, bob: rng()*6.28 }); }
+  for (let i=0;i<4;i++){ const p = take(); items.push({ type:'nails',  x:p.x, y:p.y, live:true, bob: rng()*6.28 }); }
+  { const p = take(); items.push({ type:'axe',    x:p.x, y:p.y, live:true, bob: rng()*6.28 }); }
+  { const p = take(); items.push({ type:'camera', x:p.x, y:p.y, live:true, bob: rng()*6.28 }); }
+  for (let i=0;i<3;i++){ const p = take(); items.push({ type:'plates', x:p.x, y:p.y, live:true, bob: rng()*6.28 }); }
+
+  /* ---- light that costs nothing but shows you to him ---- */
+  { const p = take(); items.push({ type:'lantern', x:p.x, y:p.y, live:true, bob: rng()*6.28 }); }
+
+  /* ---- Elias's watch, the ledger pages, and the key to the cellar doors ---- */
+  { const p = take(); items.push({ type:'watch', x:p.x, y:p.y, live:true, bob: rng()*6.28 }); }
+  for (let i=0;i<LEDGER.length;i++){ const p = take(); items.push({ type:'ledger', idx:i, x:p.x, y:p.y, live:true, bob: rng()*6.28 }); }
+  { const p = take(); items.push({ type:'cellarkey', x:p.x, y:p.y, live:true, bob: rng()*6.28 }); }
 
   /* ---- the strongbox: three numbers, written down in three places ---- */
   safeOpen = false;
@@ -1888,6 +1971,454 @@ const PROPS = {
     return p;
   }
 };
+
+/* ---- THE NEW ROSTER: what you throw, what you burn, what you carry out ----
+   Every model stands on y=0. These are read at arm's length under a torch,
+   so a bottle gets a shoulder and a label, not a cylinder.               */
+Object.assign(PROPS, {
+  /* what is left of a bottle after it has done its job: a ring of base
+     glass still standing, and the rest of it thrown across the boards */
+  bottleShardsItem(){
+    const p = [];
+    p.push({ tex:'greenBottle', prim: GEO.cyl(0.032, 0.030, 0.022, 12, false, true), mat: mat(0, 0.011, 0), glow: 0.05 });
+    const spread = [
+      [ 0.075, 0.004,  0.030, 0.9], [-0.062, 0.003,  0.058, 0.5],
+      [ 0.030, 0.003, -0.082, 1.7], [-0.088, 0.002, -0.026, 2.4],
+      [ 0.014, 0.004,  0.096, 0.2], [-0.034, 0.002, -0.104, 1.1],
+      [ 0.112, 0.002, -0.058, 2.9], [-0.120, 0.003,  0.014, 0.7]
+    ];
+    for (const s of spread)
+      p.push({ tex:'greenBottle', prim: GEO.box(0.020, 0.004, 0.013, 1),
+               mat: mat(s[0], s[1], s[2], 0, s[3], 0), glow: 0.05 });
+    return p;
+  },
+
+  /* An empty bottle off the scullery shelf. It is worth more than the
+     pistol, because it puts the noise somewhere you are not.           */
+  bottleItem(){
+    const p = [], G = 'greenBottle';
+    p.push({ tex:G, prim: GEO.loft([
+      { y:0.000, rx:0.034,  rz:0.034,  k:2 },
+      { y:0.014, rx:0.042,  rz:0.042,  k:2 },
+      { y:0.106, rx:0.042,  rz:0.042,  k:2 },
+      { y:0.150, rx:0.031,  rz:0.031,  k:2 },   // the shoulder
+      { y:0.178, rx:0.016,  rz:0.016,  k:2 },
+      { y:0.222, rx:0.0155, rz:0.0155, k:2 }
+    ], 16, 3, true, true), mat: mat(0, 0.002, 0), glow: 0.12 });
+    p.push({ tex:G, prim: GEO.cyl(0.0435,0.0435,0.011,16,false,false), mat: mat(0, 0.008, 0) });   // the heel ring
+    p.push({ tex:G, prim: GEO.cyl(0.0195,0.0195,0.007,14,false,false), mat: mat(0, 0.212, 0) });   // collar
+    p.push({ tex:G, prim: GEO.cyl(0.0180,0.0180,0.012,14), mat: mat(0, 0.228, 0), glow: 0.12 });   // the lip
+    p.push({ tex:'waxCandle', prim: GEO.cyl(0.0130,0.0148,0.020,10), mat: mat(0, 0.238, 0) });     // driven cork
+    p.push({ tex:'paper', prim: GEO.cyl(0.0428,0.0428,0.062,16,false,false), mat: mat(0, 0.070, 0), glow: 0.10 }); // the label
+    p.push({ tex:'paper', prim: GEO.cyl(0.0428,0.0428,0.013,16,false,false), mat: mat(0, 0.132, 0) });            // and the band above it
+    p.push({ tex:'paper', prim: GEO.cyl(0.0330,0.0330,0.010,14,false,false), mat: mat(0, 0.168, 0) });            // torn neck seal
+    return p;
+  },
+  /* A road flare, cold. Struck on its own cap and thrown - light, not
+     sound, which is the one thing that pushes him away instead of in.  */
+  flareItem(){
+    const p = [], C = 'tinRed';
+    p.push({ tex:C, prim: GEO.cyl(0.0165,0.0165,0.195,14), mat: mat(0, 0.0176, 0, 0,0, Math.PI/2) });              // the case
+    p.push({ tex:'paper', prim: GEO.cyl(0.0172,0.0172,0.072,14,false,false), mat: mat(-0.022, 0.0176, 0, 0,0, Math.PI/2), glow: 0.10 }); // printed wrap
+    p.push({ tex:'paper', prim: GEO.cyl(0.0172,0.0172,0.011,14,false,false), mat: mat(0.046, 0.0176, 0, 0,0, Math.PI/2) });              // warning stripe
+    p.push({ tex:'paper', prim: GEO.cyl(0.0172,0.0172,0.011,14,false,false), mat: mat(0.068, 0.0176, 0, 0,0, Math.PI/2) });
+    p.push({ tex:'rawIron', prim: GEO.cyl(0.0176,0.0176,0.010,14), mat: mat(0.100, 0.0176, 0, 0,0, Math.PI/2) });  // ferrule at the striking end
+    p.push({ tex:'waxCandle', prim: GEO.cyl(0.0150,0.0132,0.017,12), mat: mat(0.112, 0.0176, 0, 0,0, Math.PI/2) });// the compound under the cap
+    p.push({ tex:'leatherPouch', prim: GEO.cyl(0.0168,0.0168,0.022,12), mat: mat(0.128, 0.0176, 0, 0,0, Math.PI/2) }); // striker cap
+    p.push({ tex:'sackCloth', prim: GEO.cyl(0.0134,0.0134,0.004,10), mat: mat(0.141, 0.0176, 0, 0,0, Math.PI/2) });// the abrasive face you scrape
+    p.push({ tex:'rawIron', prim: GEO.cyl(0.0172,0.0172,0.009,14), mat: mat(-0.100, 0.0176, 0, 0,0, Math.PI/2) }); // butt cap
+    p.push({ tex:'toolMetal', prim: GEO.cyl(0.0022,0.0022,0.145,6), mat: mat(-0.012, 0.0038, 0.021, 0,0, Math.PI/2) }); // the wire stand, folded flat
+    p.push({ tex:'toolMetal', prim: GEO.cyl(0.0022,0.0022,0.032,6), mat: mat(-0.084, 0.0120, 0.014, 0.85, 0, 0) });
+    p.push({ tex:'toolMetal', prim: GEO.cyl(0.0022,0.0022,0.032,6), mat: mat(0.060, 0.0120, 0.014, 0.85, 0, 0) });
+    return p;
+  },
+  /* The same flare burning where it landed. The case has eaten itself
+     down a third and the head is a white core in a red envelope.       */
+  flareLitItem(){
+    const p = [], C = 'tinRed';
+    p.push({ tex:'sootStone', prim: GEO.cyl(0.125,0.125,0.002,20), mat: mat(0.048, 0.0012, 0) });   // scorch on the boards
+    p.push({ tex:C, prim: GEO.cyl(0.0165,0.0165,0.140,14), mat: mat(-0.038, 0.0176, 0, 0,0, Math.PI/2) });
+    p.push({ tex:'paper', prim: GEO.cyl(0.0172,0.0172,0.060,14,false,false), mat: mat(-0.058, 0.0176, 0, 0,0, Math.PI/2) });
+    p.push({ tex:'rawIron', prim: GEO.cyl(0.0172,0.0172,0.009,14), mat: mat(-0.104, 0.0176, 0, 0,0, Math.PI/2) }); // butt cap
+    p.push({ tex:'sootStone', prim: GEO.cyl(0.0170,0.0160,0.018,14), mat: mat(0.038, 0.0176, 0, 0,0, Math.PI/2) });// the burnt-back lip
+    p.push({ tex:'toolMetal', prim: GEO.cyl(0.0022,0.0022,0.145,6), mat: mat(-0.050, 0.0038, 0.021, 0,0, Math.PI/2) });
+    p.push({ tex:'emberEye', prim: GEO.blob(0.0215, 0.0200, 0.0215, 14, 10), mat: mat(0.056, 0.0212, 0), glow: 1 });     // the burning head
+    p.push({ tex:'bulb',     prim: GEO.sphere(0.0125, 12, 8, 1.15), mat: mat(0.054, 0.0220, 0), glow: 1 });              // the white core inside it
+    p.push({ tex:'emberEye', prim: GEO.blob(0.0110, 0.0280, 0.0110, 12, 10), mat: mat(0.062, 0.0470, 0.002, 0,0, -0.22), glow: 1 }); // the tongue leaning off it
+    p.push({ tex:'emberEye', prim: GEO.blob(0.0070, 0.0155, 0.0070, 10, 8), mat: mat(0.074, 0.0680, -0.006, 0,0, -0.45), glow: 1 });
+    for (let i=0;i<4;i++)                                                                                               // sparks coming off the head
+      p.push({ tex:'emberEye', prim: GEO.blob(0.0028, 0.0028, 0.0028, 8, 6),
+               mat: mat(0.086 + i*0.020, 0.038 + Math.sin(i*2.3)*0.024, Math.cos(i*1.7)*0.018), glow: 1 });
+    return p;
+  },
+  /* A wind-up box in a rosewood case. Wound and set down, it sings for
+     three quarters of a minute and he goes to it instead of to you.    */
+  musicboxItem(){
+    const p = [], W = 'gunWood', B = 'brass';
+    p.push({ tex:'leatherPouch', prim: GEO.box(0.152,0.005,0.102,1), mat: mat(0, 0.0025, 0) });      // the felt it has sat on for forty years
+    p.push({ tex:W, prim: GEO.box(0.176,0.010,0.122,1.5), mat: mat(0, 0.010, 0) });                  // plinth moulding
+    p.push({ tex:W, prim: GEO.box(0.168,0.062,0.114,1.5), mat: mat(0, 0.046, 0) });                  // the case
+    p.push({ tex:W, prim: GEO.box(0.178,0.016,0.124,1.5), mat: mat(0, 0.085, 0) });                  // the lid, shut
+    p.push({ tex:W, prim: GEO.box(0.172,0.005,0.118,1.5), mat: mat(0, 0.095, 0) });                  // and its bevel
+    for (const sx of [-1,1]) for (const sz of [-1,1]){
+      p.push({ tex:B, prim: GEO.box(0.014,0.058,0.014,1), mat: mat(sx*0.078, 0.046, sz*0.052) });    // corner caps
+      p.push({ tex:B, prim: GEO.cyl(0.010,0.012,0.011,10), mat: mat(sx*0.070, 0.0055, sz*0.044) });  // feet
+    }
+    for (const sx of [-1,1])
+      p.push({ tex:B, prim: GEO.box(0.020,0.014,0.006,1), mat: mat(sx*0.052, 0.078, -0.058) });      // lid hinges at the back
+    p.push({ tex:B, prim: GEO.box(0.050,0.002,0.032,1), mat: mat(0, 0.094, 0.014) });                // engraved plate on the lid
+    p.push({ tex:B, prim: GEO.box(0.024,0.018,0.007,1), mat: mat(0, 0.074, 0.060) });                // the catch
+    p.push({ tex:B, prim: GEO.cyl(0.005,0.005,0.008,10), mat: mat(0, 0.074, 0.065, 0,0, Math.PI/2) });
+    p.push({ tex:B, prim: GEO.cyl(0.006,0.006,0.028,10), mat: mat(-0.096, 0.038, 0, 0,0, Math.PI/2) });   // winding shaft
+    p.push({ tex:B, prim: GEO.cyl(0.015,0.015,0.006,12), mat: mat(-0.088, 0.038, 0, 0,0, Math.PI/2) });   // its boss
+    p.push({ tex:B, prim: GEO.box(0.008,0.036,0.008,1), mat: mat(-0.110, 0.050, 0) });                    // the crank arm
+    p.push({ tex:'bone', prim: GEO.cyl(0.008,0.008,0.016,10), mat: mat(-0.110, 0.070, 0) });              // and the knob you turn
+    p.push({ tex:B, prim: GEO.cyl(0.011,0.011,0.005,12), mat: mat(0.058, 0.046, 0.058, Math.PI/2, 0, 0) });// keyhole escutcheon
+    return p;
+  },
+  /* Lid up and playing: the comb, the pinned barrel, and the governor
+     spinning too fast to see. Six seconds of his attention.            */
+  musicboxOpenItem(){
+    const p = [], W = 'gunWood', B = 'brass';
+    p.push({ tex:'leatherPouch', prim: GEO.box(0.152,0.005,0.102,1), mat: mat(0, 0.0025, 0) });
+    p.push({ tex:W, prim: GEO.box(0.176,0.010,0.122,1.5), mat: mat(0, 0.010, 0) });
+    p.push({ tex:W, prim: GEO.box(0.168,0.062,0.114,1.5), mat: mat(0, 0.046, 0) });
+    for (const sx of [-1,1]) for (const sz of [-1,1]){
+      p.push({ tex:B, prim: GEO.box(0.014,0.058,0.014,1), mat: mat(sx*0.078, 0.046, sz*0.052) });
+      p.push({ tex:B, prim: GEO.cyl(0.010,0.012,0.011,10), mat: mat(sx*0.070, 0.0055, sz*0.044) });
+    }
+    for (const sx of [-1,1])
+      p.push({ tex:B, prim: GEO.box(0.020,0.014,0.006,1), mat: mat(sx*0.052, 0.078, -0.058) });     // the hinges it swings on
+    /* the lid, thrown back on those hinges: rotated -1.25 about x and
+       carried to where that rotation leaves its centre                 */
+    p.push({ tex:W, prim: GEO.box(0.178,0.016,0.124,1.5), mat: mat(0, 0.1504, -0.0464, -1.25, 0, 0) });
+    p.push({ tex:'velvetGreen', prim: GEO.box(0.160,0.004,0.108,1.2), mat: mat(0, 0.1480, -0.0392, -1.25, 0, 0) });   // the lining
+    p.push({ tex:'mirrorGlass', prim: GEO.box(0.104,0.002,0.062,1),  mat: mat(0, 0.1416, -0.0388, -1.25, 0, 0), glow: 0.10 }); // the little glass in the lid
+    p.push({ tex:'paper', prim: GEO.box(0.052,0.002,0.030,1), mat: mat(0.048, 0.1414, -0.0388, -1.25, 0, 0), glow: 0.10 });    // the maker's label
+    p.push({ tex:B, prim: GEO.box(0.150,0.005,0.094,1), mat: mat(0, 0.078, 0.004) });               // the bed plate
+    p.push({ tex:B, prim: GEO.cyl(0.017,0.017,0.092,14), mat: mat(-0.006, 0.098, -0.012, 0,0, Math.PI/2) });  // the pinned barrel
+    p.push({ tex:B, prim: GEO.cyl(0.021,0.021,0.008,14), mat: mat(0.044, 0.098, -0.012, 0,0, Math.PI/2) });   // its end flanges
+    p.push({ tex:B, prim: GEO.cyl(0.021,0.021,0.008,14), mat: mat(-0.056, 0.098, -0.012, 0,0, Math.PI/2) });
+    for (let i=0;i<22;i++){                                                                          // the pins that pluck it
+      const a = i*1.31;
+      p.push({ tex:'toolMetal', prim: GEO.box(0.0030,0.0030,0.0030,1),
+               mat: mat(-0.044 + i*0.0042, 0.098 + Math.cos(a)*0.0182, -0.012 + Math.sin(a)*0.0182) });
+    }
+    p.push({ tex:'toolMetal', prim: GEO.box(0.098,0.008,0.014,1), mat: mat(-0.006, 0.086, 0.034) }); // the comb, screwed down
+    for (let i=0;i<14;i++)                                                                           // and its teeth, longest first
+      p.push({ tex:'toolMetal', prim: GEO.box(0.0042,0.0025,0.020 - i*0.0008,1),
+               mat: mat(-0.048 + i*0.0068, 0.090, 0.022) });
+    for (const sx of [-1,1])
+      p.push({ tex:B, prim: GEO.cyl(0.0035,0.0035,0.010,8), mat: mat(sx*0.054, 0.090, 0.036) });     // comb screws
+    p.push({ tex:B, prim: GEO.cyl(0.026,0.026,0.020,16), mat: mat(-0.062, 0.092, 0.028, 0,0, Math.PI/2) }); // the spring barrel
+    p.push({ tex:B, prim: GEO.cyl(0.008,0.008,0.026,10), mat: mat(0.058, 0.092, 0.030, 0,0, Math.PI/2) });  // the governor spindle
+    p.push({ tex:'toolMetal', prim: GEO.box(0.002,0.020,0.020,1), mat: mat(0.066, 0.092, 0.030) });         // and the fly, blurred
+    p.push({ tex:B, prim: GEO.cyl(0.011,0.011,0.005,12), mat: mat(0.058, 0.046, 0.058, Math.PI/2, 0, 0) });
+    p.push({ tex:B, prim: GEO.cyl(0.006,0.006,0.028,10), mat: mat(-0.096, 0.038, 0, 0,0, Math.PI/2) });
+    p.push({ tex:B, prim: GEO.box(0.008,0.036,0.008,1), mat: mat(-0.110, 0.050, 0) });
+    p.push({ tex:'bone', prim: GEO.cyl(0.008,0.008,0.016,10), mat: mat(-0.110, 0.070, 0) });
+    return p;
+  },
+  /* A field dressing in its wax paper, half unrolled already. Bleeding
+     leaves a line through the house that he can read at a walk.        */
+  bandageItem(){
+    const p = [], L = 'wrapCloth';
+    p.push({ tex:'paper', prim: GEO.box(0.132,0.006,0.100,1), mat: mat(-0.010, 0.003, 0.006, 0, 0.18, 0) });  // the wax paper it came out of
+    p.push({ tex:'paper', prim: GEO.box(0.056,0.004,0.070,1), mat: mat(-0.086, 0.013, -0.024, 0.30, 0.55, 0) }); // the torn corner
+    p.push({ tex:L, prim: GEO.cyl(0.040,0.040,0.058,16), mat: mat(0, 0.042, 0, 0,0, Math.PI/2) });               // the roll
+    p.push({ tex:L, prim: GEO.cyl(0.0415,0.0415,0.046,16,false,false), mat: mat(0.006, 0.042, 0, 0,0, Math.PI/2) }); // its loose outer turn
+    for (const s of [-1,1])
+      p.push({ tex:'paper', prim: GEO.cyl(0.0225,0.0225,0.004,14), mat: mat(s*0.030, 0.042, 0, 0,0, Math.PI/2) }); // the paper core at each end
+    p.push({ tex:'paper', prim: GEO.cyl(0.0420,0.0420,0.022,16,false,false), mat: mat(-0.014, 0.042, 0, 0,0, Math.PI/2), glow: 0.10 }); // printed band
+    for (const s of [-1,1])                                                                                        // the cotton tapes, tied
+      p.push({ tex:'sackCloth', prim: GEO.box(0.005,0.084,0.005,1), mat: mat(s*0.024, 0.042, 0, 0, 0, 0.35 + s*0.10) });
+    p.push({ tex:'sackCloth', prim: GEO.box(0.005,0.036,0.005,1), mat: mat(0.026, 0.076, 0.014, 0.6, 0, -1.1) });
+    for (let i=0;i<5;i++){                                                                                         // the free tail, run out onto the boards
+      const t = i/4;
+      p.push({ tex:L, prim: GEO.box(0.032,0.006,0.056,1.2),
+               mat: mat(0.048 + i*0.029, 0.038 - t*0.033, 0.004 + i*0.004, 0, -0.10 + i*0.06, 0.80 - t*0.80) });
+    }
+    return p;
+  },
+  /* A glass syringe of adrenaline, sheath already off. Eighteen seconds
+     in which nothing tires you and everything you do is louder.        */
+  adrenalineItem(){
+    const p = [], M = 'toolMetal';
+    p.push({ tex:'glass', prim: GEO.cyl(0.0115,0.0115,0.082,14), mat: mat(0.006, 0.0122, 0, 0,0, Math.PI/2), glow: 0.14 }); // the barrel
+    p.push({ tex:'brass', prim: GEO.cyl(0.0092,0.0092,0.050,12), mat: mat(-0.006, 0.0122, 0, 0,0, Math.PI/2), glow: 0.18 });// the amber standing in it
+    p.push({ tex:'paper', prim: GEO.cyl(0.0119,0.0119,0.024,14,false,false), mat: mat(0.024, 0.0122, 0, 0,0, Math.PI/2), glow: 0.10 }); // graduation strip
+    p.push({ tex:'glass', prim: GEO.cyl(0.0122,0.0122,0.006,14,false,false), mat: mat(-0.032, 0.0122, 0, 0,0, Math.PI/2) });// barrel collar
+    p.push({ tex:M, prim: GEO.box(0.005,0.023,0.034,1), mat: mat(-0.038, 0.0122, 0) });                     // the finger flange
+    p.push({ tex:M, prim: GEO.cyl(0.0035,0.0035,0.048,8), mat: mat(-0.062, 0.0122, 0, 0,0, Math.PI/2) });   // plunger rod
+    p.push({ tex:M, prim: GEO.box(0.044,0.008,0.002,1), mat: mat(-0.062, 0.0122, 0) });                     // and its cross fins
+    p.push({ tex:M, prim: GEO.box(0.044,0.002,0.008,1), mat: mat(-0.062, 0.0122, 0) });
+    p.push({ tex:M, prim: GEO.cyl(0.0120,0.0120,0.004,12), mat: mat(-0.088, 0.0122, 0, 0,0, Math.PI/2) });  // thumb rest
+    p.push({ tex:'brass', prim: GEO.cyl(0.0090,0.0055,0.015,10), mat: mat(0.054, 0.0122, 0, 0,0, Math.PI/2) }); // the hub
+    p.push({ tex:'brass', prim: GEO.cyl(0.0068,0.0068,0.005,10), mat: mat(0.064, 0.0122, 0, 0,0, Math.PI/2) });
+    p.push({ tex:M, prim: GEO.cyl(0.0014,0.0009,0.048,6), mat: mat(0.090, 0.0122, 0, 0,0, Math.PI/2) });    // the needle
+    p.push({ tex:'rubberGrip', prim: GEO.cyl(0.0058,0.0046,0.042,8), mat: mat(0.072, 0.0058, 0.034, 0, 0.45, Math.PI/2) }); // the sheath, pulled and dropped
+    p.push({ tex:'paper', prim: GEO.box(0.030,0.002,0.020,1), mat: mat(-0.056, 0.001, -0.036, 0, 0.6, 0), glow: 0.10 });    // the chemist's slip with it
+    return p;
+  },
+  /* A bottle of laudanum: brown glass, red wax over the cork, and the
+     tincture standing three quarters down. Thirty quiet seconds.       */
+  laudanumItem(){
+    const p = [], G = 'greenBottle';
+    p.push({ tex:G, prim: GEO.loft([
+      { y:0.000, rx:0.030,  rz:0.020,  k:3.2 },
+      { y:0.011, rx:0.034,  rz:0.023,  k:3.2 },
+      { y:0.086, rx:0.034,  rz:0.023,  k:3.2 },
+      { y:0.106, rx:0.022,  rz:0.017,  k:2.4 },   // the shoulder, squared off the way apothecary glass is
+      { y:0.120, rx:0.0110, rz:0.0110, k:2 },
+      { y:0.148, rx:0.0105, rz:0.0105, k:2 }
+    ], 18, 3, true, true), mat: mat(0, 0.002, 0), glow: 0.12 });
+    p.push({ tex:'leatherPouch', prim: GEO.box(0.060,0.052,0.040,1), mat: mat(0, 0.034, 0) });      // the tincture inside
+    p.push({ tex:G, prim: GEO.cyl(0.0138,0.0138,0.008,12,false,false), mat: mat(0, 0.150, 0) });    // the lip
+    p.push({ tex:'waxCandle', prim: GEO.cyl(0.0100,0.0112,0.018,10), mat: mat(0, 0.156, 0) });      // cork
+    p.push({ tex:'sashRed', prim: GEO.cyl(0.0150,0.0128,0.014,12), mat: mat(0, 0.164, 0) });        // wax over the top of it
+    p.push({ tex:'sashRed', prim: GEO.cyl(0.0030,0.0018,0.016,8), mat: mat(0.012, 0.152, 0.004) }); // one drip that ran
+    p.push({ tex:'paper', prim: GEO.box(0.050,0.056,0.002,1), mat: mat(0, 0.050, 0.024), glow: 0.12 });   // the label
+    p.push({ tex:'paper', prim: GEO.box(0.002,0.028,0.022,1), mat: mat(-0.035, 0.056, 0) });             // the poison mark on the flank
+    p.push({ tex:'paper', prim: GEO.box(0.002,0.028,0.022,1), mat: mat(0.035, 0.056, 0) });
+    p.push({ tex:'sackCloth', prim: GEO.cyl(0.0130,0.0130,0.004,12,false,false), mat: mat(0, 0.128, 0) });// string round the neck
+    p.push({ tex:'paper', prim: GEO.box(0.026,0.020,0.002,1), mat: mat(0.020, 0.116, 0.006, 0, 0.5, 0.25), glow: 0.10 }); // the tag on it
+    return p;
+  },
+  /* A pneumatic nail gun. It drives a nail through an inch of oak and
+     makes less noise doing it than a dropped spoon - that is the point.*/
+  nailgunItem(){
+    const p = [], G = 'gunmetal', M = 'toolMetal';
+    p.push({ tex:G, prim: GEO.box(0.128,0.062,0.050,2), mat: mat(0.012, 0.108, 0) });               // the body
+    p.push({ tex:G, prim: GEO.cyl(0.028,0.028,0.116,14), mat: mat(0.010, 0.148, 0, 0,0, Math.PI/2) });  // the cylinder housing over it
+    p.push({ tex:G, prim: GEO.cyl(0.024,0.019,0.014,12), mat: mat(-0.056, 0.148, 0, 0,0, Math.PI/2) }); // exhaust deflector
+    p.push({ tex:'rubberGrip', prim: GEO.box(0.044,0.082,0.042,2), mat: mat(-0.062, 0.046, 0, 0,0, 0.16) }); // the grip
+    p.push({ tex:'rubberGrip', prim: GEO.box(0.046,0.014,0.044,1), mat: mat(-0.070, 0.011, 0, 0,0, 0.16) }); // butt pad on the boards
+    p.push({ tex:G, prim: GEO.box(0.034,0.050,0.036,1.4), mat: mat(0.075, 0.063, 0) });             // the nose
+    p.push({ tex:M, prim: GEO.cyl(0.013,0.010,0.038,10), mat: mat(0.075, 0.019, 0) });              // and the safety tip it stands on
+    p.push({ tex:M, prim: GEO.cyl(0.008,0.008,0.020,8), mat: mat(0.075, 0.010, 0) });
+    p.push({ tex:G, prim: GEO.box(0.150,0.022,0.030,1.4), mat: mat(0.008, 0.066, 0) });             // the magazine rail
+    p.push({ tex:M, prim: GEO.box(0.150,0.004,0.006,1), mat: mat(0.008, 0.054, 0) });               // the slot along its underside
+    for (let i=0;i<11;i++)                                                                          // the strip of nails riding in it
+      p.push({ tex:M, prim: GEO.box(0.0035,0.014,0.0035,1), mat: mat(-0.052 + i*0.011, 0.062, 0) });
+    p.push({ tex:'rubberGrip', prim: GEO.box(0.012,0.020,0.026,1), mat: mat(-0.062, 0.066, 0) });   // the follower
+    for (let i=0;i<5;i++)                                                                           // its spring, showing at the back of the rail
+      p.push({ tex:M, prim: GEO.cyl(0.008,0.008,0.004,8), mat: mat(-0.076 - i*0.007, 0.066, 0, 0,0, Math.PI/2) });
+    p.push({ tex:M, prim: GEO.box(0.010,0.026,0.010,1), mat: mat(-0.040, 0.080, 0, 0,0, 0.28) });   // trigger
+    p.push({ tex:G, prim: GEO.box(0.042,0.008,0.024,1), mat: mat(-0.046, 0.062, 0) });              // and its guard
+    p.push({ tex:G, prim: GEO.box(0.008,0.020,0.022,1), mat: mat(-0.026, 0.070, 0) });
+    p.push({ tex:'brass', prim: GEO.cyl(0.012,0.012,0.016,12), mat: mat(-0.088, 0.108, 0, 0,0, Math.PI/2) }); // the air fitting
+    p.push({ tex:'rubberGrip', prim: GEO.cyl(0.011,0.011,0.038,10), mat: mat(-0.108, 0.108, 0, 0,0, Math.PI/2) }); // and the hose stub off it
+    p.push({ tex:'tinRed', prim: GEO.box(0.046,0.020,0.002,1), mat: mat(0.010, 0.108, 0.026) });    // the maker's plate
+    p.push({ tex:'tinRed', prim: GEO.box(0.046,0.020,0.002,1), mat: mat(0.010, 0.108, -0.026) });
+    return p;
+  },
+  /* A box of nails, torn open, half of them across the boards already. */
+  nailsItem(){
+    const p = [], M = 'toolMetal';
+    p.push({ tex:'paper', prim: GEO.box(0.110,0.058,0.078,1.2), mat: mat(0, 0.030, 0) });           // the carton
+    p.push({ tex:'paper', prim: GEO.box(0.112,0.004,0.080,1.2), mat: mat(0, 0.002, 0) });
+    p.push({ tex:'paper', prim: GEO.box(0.110,0.030,0.004,1), mat: mat(0, 0.072, -0.038, -0.55, 0, 0) });  // the flap torn back
+    p.push({ tex:'paper', prim: GEO.box(0.048,0.026,0.004,1), mat: mat(-0.028, 0.070, 0.036, 0.70, 0, 0) });
+    p.push({ tex:'paper', prim: GEO.box(0.070,0.030,0.002,1), mat: mat(0, 0.032, 0.040), glow: 0.10 });    // the printed face
+    for (let i=0;i<9;i++){                                                                          // the nails standing in the box
+      const a = i*1.9;
+      p.push({ tex:M, prim: GEO.cyl(0.0018,0.0011,0.052,6),
+               mat: mat(Math.cos(a)*0.028, 0.070, Math.sin(a)*0.018, 0, 0, Math.sin(a)*0.22) });
+      p.push({ tex:M, prim: GEO.cyl(0.0042,0.0042,0.0018,8),
+               mat: mat(Math.cos(a)*0.028, 0.096, Math.sin(a)*0.018) });
+    }
+    for (let i=0;i<7;i++){                                                                          // and the ones that went across the floor
+      const a = i*2.4, r = 0.085 + (i % 3)*0.026;
+      p.push({ tex:M, prim: GEO.cyl(0.0018,0.0011,0.050,6),
+               mat: mat(Math.cos(a)*r, 0.0018, Math.sin(a)*r, Math.PI/2, a*1.3, 0) });
+      p.push({ tex:M, prim: GEO.cyl(0.0042,0.0042,0.0018,8),
+               mat: mat(Math.cos(a)*r - Math.cos(a*1.3)*0.026, 0.0042, Math.sin(a)*r + Math.sin(a*1.3)*0.026, 0,0, Math.PI/2) });
+    }
+    return p;
+  },
+  /* A fire axe off the hallway bracket, dropped on its side. Red cheeks,
+     a hickory haft, and a spike on the poll for pulling laths.         */
+  axeItem(){
+    const p = [];
+    p.push({ tex:'gunWood', prim: GEO.cyl(0.020,0.016,0.620,10), mat: mat(-0.030, 0.024, 0, 0,0, Math.PI/2) });   // the haft
+    p.push({ tex:'tinRed', prim: GEO.cyl(0.0206,0.0206,0.050,10,false,false), mat: mat(0.210, 0.024, 0, 0,0, Math.PI/2) }); // the painted band
+    p.push({ tex:'rubberGrip', prim: GEO.cyl(0.022,0.022,0.140,12), mat: mat(-0.272, 0.024, 0, 0,0, Math.PI/2) });// the taped grip
+    for (let i=0;i<7;i++)                                                                                         // the turns of tape on it
+      p.push({ tex:'rubberGrip', prim: GEO.cyl(0.0228,0.0228,0.006,12,false,false), mat: mat(-0.334 + i*0.020, 0.024, 0, 0,0, Math.PI/2) });
+    p.push({ tex:'toolMetal', prim: GEO.cyl(0.023,0.020,0.014,12), mat: mat(-0.350, 0.024, 0, 0,0, Math.PI/2) }); // butt cap
+    p.push({ tex:'rawIron', prim: GEO.cyl(0.024,0.024,0.062,12), mat: mat(0.292, 0.024, 0, 0,0, Math.PI/2) });    // the eye the haft runs through
+    p.push({ tex:'toolMetal', prim: GEO.box(0.010,0.024,0.024,1), mat: mat(0.328, 0.024, 0) });                   // the wedge driven in the top
+    p.push({ tex:'tinRed', prim: GEO.box(0.072,0.026,0.100,1.4), mat: mat(0.292, 0.020, 0.062) });                // the cheek
+    p.push({ tex:'tinRed', prim: GEO.box(0.076,0.020,0.038,1.4), mat: mat(0.292, 0.019, 0.126) });                // ground back toward the edge
+    p.push({ tex:'rawIron', prim: GEO.box(0.078,0.009,0.024,1), mat: mat(0.292, 0.019, 0.152) });                 // the bit, bright where it has been sharpened
+    p.push({ tex:'tinRed', prim: GEO.box(0.030,0.024,0.078,1.2), mat: mat(0.292, 0.020, -0.052) });               // the poll
+    p.push({ tex:'rawIron', prim: GEO.cyl(0.012,0.002,0.052,8), mat: mat(0.292, 0.020, -0.114, Math.PI/2, 0, 0) });// and the spike off the back of it
+    for (const s of [-1,1])                                                                                       // the rivets through the eye
+      p.push({ tex:'brass', prim: GEO.cyl(0.0045,0.0045,0.032,8), mat: mat(0.292 + s*0.016, 0.024, 0.032) });
+    return p;
+  },
+  /* A plate camera on its baseboard, bellows out, magnesium lamp still
+     clamped to the side. The flash is light, so it burns him without
+     ever telling him which room you fired it from.                     */
+  cameraItem(){
+    const p = [], W = 'gunWood', B = 'brass', M = 'toolMetal';
+    p.push({ tex:W, prim: GEO.box(0.150,0.012,0.132,1.4), mat: mat(0, 0.006, 0) });                 // the baseboard
+    p.push({ tex:W, prim: GEO.box(0.130,0.112,0.110,1.5), mat: mat(-0.006, 0.068, 0) });            // the body
+    for (const sx of [-1,1]) for (const sz of [-1,1])
+      p.push({ tex:B, prim: GEO.box(0.007,0.112,0.007,1), mat: mat(-0.006 + sx*0.063, 0.068, sz*0.053) }); // brass on the corners
+    for (const sz of [-1,1])
+      p.push({ tex:B, prim: GEO.box(0.132,0.006,0.006,1), mat: mat(-0.006, 0.122, sz*0.053) });
+    for (let i=0;i<5;i++)                                                                           // the bellows, drawn out
+      p.push({ tex:'leatherPouch', prim: GEO.box(0.013,0.098 - i*0.009,0.094 - i*0.009,1.2), mat: mat(0.068 + i*0.017, 0.068, 0) });
+    p.push({ tex:W, prim: GEO.box(0.010,0.072,0.072,1), mat: mat(0.158, 0.068, 0) });               // the lens board
+    p.push({ tex:B, prim: GEO.cyl(0.024,0.021,0.034,14), mat: mat(0.178, 0.068, 0, 0,0, Math.PI/2) });   // the barrel
+    p.push({ tex:B, prim: GEO.cyl(0.027,0.027,0.007,14,false,false), mat: mat(0.194, 0.068, 0, 0,0, Math.PI/2) }); // its rim
+    p.push({ tex:'glass', prim: GEO.cyl(0.020,0.020,0.004,14), mat: mat(0.191, 0.068, 0, 0,0, Math.PI/2), glow: 0.16 }); // the front element
+    p.push({ tex:M, prim: GEO.box(0.004,0.022,0.004,1), mat: mat(0.166, 0.094, 0, 0,0, 0.3) });     // the shutter lever
+    p.push({ tex:'rubberGrip', prim: GEO.cyl(0.004,0.004,0.055,8), mat: mat(0.150, 0.020, 0.040, 0.9, 0.6, 0) }); // the release cable, coiled off it
+    p.push({ tex:'leatherPouch', prim: GEO.box(0.028,0.096,0.096,1.2), mat: mat(-0.084, 0.068, 0) });// the focusing hood
+    p.push({ tex:'mirrorGlass', prim: GEO.box(0.004,0.082,0.082,1), mat: mat(-0.098, 0.068, 0), glow: 0.12 }); // and the ground glass in it
+    p.push({ tex:M, prim: GEO.box(0.006,0.005,0.092,1), mat: mat(-0.060, 0.126, 0) });              // the plate holder slot
+    for (const sx of [-1,1])
+      p.push({ tex:M, prim: GEO.box(0.008,0.026,0.008,1), mat: mat(-0.006 + sx*0.032, 0.136, 0) }); // handle posts
+    p.push({ tex:M, prim: GEO.cyl(0.005,0.005,0.072,8), mat: mat(-0.006, 0.150, 0, 0,0, Math.PI/2) }); // the carry handle
+    p.push({ tex:B, prim: GEO.box(0.042,0.014,0.002,1), mat: mat(-0.006, 0.100, 0.056) });          // maker's plate
+    p.push({ tex:M, prim: GEO.box(0.012,0.008,0.062,1), mat: mat(0.010, 0.128, -0.084) });          // the flash bracket
+    p.push({ tex:M, prim: GEO.box(0.010,0.038,0.010,1), mat: mat(0.010, 0.146, -0.108) });
+    p.push({ tex:M, prim: GEO.cyl(0.014,0.062,0.052,16,false,false), mat: mat(0.010, 0.184, -0.108, 0,0, -0.30) }); // the reflector
+    p.push({ tex:B, prim: GEO.cyl(0.011,0.011,0.016,10), mat: mat(0.010, 0.170, -0.108) });         // the lamp base
+    p.push({ tex:'bulb', prim: GEO.sphere(0.021, 12, 8, 1.15), mat: mat(0.010, 0.192, -0.108), glow: 0.30 });      // and the bulb waiting in it
+    return p;
+  },
+  /* Three exposed plates in their dark slides, and one bare one leaning
+     on the stack that somebody never got round to loading.             */
+  platesItem(){
+    const p = [], M = 'toolMetal';
+    for (let i=0;i<3;i++){
+      const y = 0.008 + i*0.017, r = (i - 1)*0.09;
+      p.push({ tex:'plankWood', prim: GEO.box(0.134,0.015,0.114,1.3), mat: mat(0, y, 0, 0, r, 0) });          // the dark slide
+      p.push({ tex:'plankWood', prim: GEO.box(0.010,0.015,0.116,1.2), mat: mat(0.070, y, 0, 0, r, 0) });      // its draw end
+      p.push({ tex:M, prim: GEO.box(0.006,0.006,0.096,1), mat: mat(0.078, y, 0, 0, r, 0) });                  // the sheath handle
+      p.push({ tex:'brass', prim: GEO.box(0.014,0.003,0.012,1), mat: mat(-0.050, y + 0.008, 0.040, 0, r, 0) });// numbered tab
+      for (const sz of [-1,1])
+        p.push({ tex:M, prim: GEO.box(0.126,0.004,0.005,1), mat: mat(0, y + 0.008, sz*0.054, 0, r, 0) });     // the light traps down each edge
+    }
+    p.push({ tex:'paper', prim: GEO.box(0.140,0.003,0.124,1), mat: mat(0.004, 0.062, 0.004, 0, 0.12, 0), glow: 0.10 }); // the wrapper laid over the top
+    for (const sx of [-1,1])                                                                                   // the band round the lot
+      p.push({ tex:'rubberGrip', prim: GEO.box(0.007,0.062,0.120,1), mat: mat(sx*0.044, 0.032, 0) });
+    p.push({ tex:'rubberGrip', prim: GEO.box(0.096,0.006,0.120,1), mat: mat(0, 0.064, 0) });
+    p.push({ tex:'glass', prim: GEO.box(0.100,0.004,0.086,1), mat: mat(0.124, 0.044, 0.030, 0, 0.35, -1.05), glow: 0.16 }); // the bare plate leaning on it
+    p.push({ tex:'paper', prim: GEO.box(0.052,0.002,0.038,1), mat: mat(0.150, 0.004, -0.056, 0, 0.7, 0), glow: 0.10 });     // an exposure slip on the boards
+    return p;
+  },
+  /* A hurricane lantern. It costs nothing to run and lights the whole
+     room, which is exactly the trouble with it.                        */
+  lanternItem(){
+    const p = [], C = 'copperTin', M = 'toolMetal';
+    p.push({ tex:C, prim: GEO.cyl(0.060,0.060,0.010,18), mat: mat(0, 0.005, 0) });                  // the foot
+    p.push({ tex:C, prim: GEO.cyl(0.055,0.047,0.052,18), mat: mat(0, 0.036, 0) });                  // the oil font
+    p.push({ tex:C, prim: GEO.cyl(0.050,0.050,0.006,18,false,false), mat: mat(0, 0.060, 0) });      // the seam round it
+    p.push({ tex:'brass', prim: GEO.cyl(0.020,0.020,0.014,12), mat: mat(0.040, 0.052, 0, 0,0, Math.PI/2) });   // the filler cap
+    p.push({ tex:'brass', prim: GEO.cyl(0.037,0.031,0.024,16), mat: mat(0, 0.074, 0) });            // the burner
+    p.push({ tex:'brass', prim: GEO.cyl(0.009,0.009,0.010,10), mat: mat(0.036, 0.072, 0, 0,0, Math.PI/2) });   // the wick spindle
+    p.push({ tex:'brass', prim: GEO.cyl(0.013,0.013,0.004,12), mat: mat(0.044, 0.072, 0, 0,0, Math.PI/2) });   // and its knurled wheel
+    p.push({ tex:'sackCloth', prim: GEO.box(0.014,0.008,0.004,1), mat: mat(0, 0.090, 0) });         // the wick, trimmed flat
+    p.push({ tex:'glass', prim: GEO.loft([
+      { y:0.086, rx:0.030, rz:0.030, k:2 },
+      { y:0.104, rx:0.044, rz:0.044, k:2 },
+      { y:0.144, rx:0.046, rz:0.046, k:2 },
+      { y:0.176, rx:0.031, rz:0.031, k:2 },
+      { y:0.190, rx:0.028, rz:0.028, k:2 }
+    ], 18, 3, false, false), mat: mat(0, 0.001, 0), glow: 0.18 });                                  // the chimney glass
+    for (let i=0;i<6;i++){                                                                          // the wire guard round it
+      const a = i/6*6.283;
+      p.push({ tex:M, prim: GEO.cyl(0.0022,0.0022,0.110,6), mat: mat(Math.cos(a)*0.050, 0.139, Math.sin(a)*0.050) });
+    }
+    p.push({ tex:M, prim: GEO.cyl(0.051,0.051,0.004,18,false,false), mat: mat(0, 0.100, 0) });      // guard rings
+    p.push({ tex:M, prim: GEO.cyl(0.051,0.051,0.004,18,false,false), mat: mat(0, 0.176, 0) });
+    p.push({ tex:C, prim: GEO.cyl(0.052,0.030,0.028,18), mat: mat(0, 0.202, 0) });                  // the hood
+    p.push({ tex:C, prim: GEO.cyl(0.020,0.026,0.016,12), mat: mat(0, 0.224, 0) });                  // the vent cap
+    p.push({ tex:'brass', prim: GEO.cyl(0.007,0.007,0.008,10), mat: mat(0, 0.236, 0) });
+    for (let i=0;i<7;i++){                                                                          // the bail, standing up
+      const a = (i/6 - 0.5)*2.5;
+      p.push({ tex:M, prim: GEO.cyl(0.0026,0.0026,0.030,6),
+               mat: mat(Math.sin(a)*0.056, 0.238 + Math.cos(a)*0.056, 0, 0, 0, a) });
+    }
+    for (const s of [-1,1])
+      p.push({ tex:M, prim: GEO.box(0.008,0.020,0.006,1), mat: mat(s*0.050, 0.206, 0) });           // the bail lugs
+    return p;
+  },
+  /* Elias's wristwatch, face up on the boards, still going. Once it is
+     in your pocket you know how long you have been down here.          */
+  watchItem(){
+    const p = [], M = 'toolMetal', L = 'leatherPouch';
+    p.push({ tex:M, prim: GEO.cyl(0.021,0.021,0.011,20), mat: mat(0, 0.0055, 0) });                 // the case
+    p.push({ tex:'brass', prim: GEO.cyl(0.0232,0.0232,0.006,20,false,false), mat: mat(0, 0.0085, 0), glow: 0.30 }); // the bezel
+    p.push({ tex:'paper', prim: GEO.cyl(0.0192,0.0192,0.002,20), mat: mat(0, 0.0118, 0), glow: 0.22 });             // the dial
+    for (let i=0;i<12;i++){                                                                         // the hour marks
+      const a = i/12*6.283;
+      p.push({ tex:'rawIron', prim: GEO.box(0.0035,0.0008,0.0018,1),
+               mat: mat(Math.cos(a)*0.0158, 0.0130, Math.sin(a)*0.0158, 0, -a, 0), glow: 0.22 });
+    }
+    p.push({ tex:'rawIron', prim: GEO.box(0.0130,0.0010,0.0016,1), mat: mat(0.0050, 0.0134, -0.0028, 0, 0.42, 0), glow: 0.22 }); // minute hand
+    p.push({ tex:'rawIron', prim: GEO.box(0.0086,0.0010,0.0020,1), mat: mat(-0.0026, 0.0134, 0.0032, 0, -2.20, 0), glow: 0.22 });// hour hand
+    p.push({ tex:'brass', prim: GEO.cyl(0.0018,0.0018,0.0024,8), mat: mat(0, 0.0140, 0) });         // the centre pin
+    p.push({ tex:'glass', prim: GEO.cyl(0.0196,0.0196,0.003,20), mat: mat(0, 0.0148, 0), glow: 0.30 });  // the crystal, chipped at one edge
+    p.push({ tex:'brass', prim: GEO.cyl(0.0040,0.0040,0.007,10), mat: mat(0.0242, 0.0060, 0, 0,0, Math.PI/2) });    // the crown
+    for (const sx of [-1,1]) for (const sz of [-1,1])                                                // the lugs
+      p.push({ tex:M, prim: GEO.box(0.008,0.007,0.006,1), mat: mat(sx*0.0110, 0.0040, sz*0.0206) });
+    for (const sz of [-1,1]){                                                                        // the strap, curled where it lies
+      p.push({ tex:L, prim: GEO.box(0.026,0.004,0.044,1.2), mat: mat(sz*0.004, 0.0025, sz*0.043, 0, sz*0.20, 0) });
+      p.push({ tex:L, prim: GEO.box(0.024,0.004,0.046,1.2), mat: mat(sz*0.016, 0.0025, sz*0.086, 0, sz*0.55, 0) });
+      p.push({ tex:L, prim: GEO.box(0.021,0.004,0.042,1.2), mat: mat(sz*0.040, 0.0025, sz*0.120, 0, sz*0.95, 0) });
+    }
+    for (let i=0;i<5;i++)                                                                            // the buckle holes punched down one tail
+      p.push({ tex:M, prim: GEO.cyl(0.0016,0.0016,0.005,8), mat: mat(0.028 + i*0.011, 0.0025, 0.104 + i*0.009) });
+    p.push({ tex:'brass', prim: GEO.box(0.019,0.003,0.005,1), mat: mat(-0.052, 0.0035, -0.132, 0, -0.95, 0) });      // the buckle
+    p.push({ tex:'brass', prim: GEO.box(0.019,0.003,0.005,1), mat: mat(-0.062, 0.0035, -0.148, 0, -0.95, 0) });
+    p.push({ tex:'brass', prim: GEO.box(0.004,0.003,0.020,1), mat: mat(-0.048, 0.0035, -0.146, 0, -0.95, 0) });
+    p.push({ tex:'brass', prim: GEO.box(0.004,0.003,0.020,1), mat: mat(-0.066, 0.0035, -0.134, 0, -0.95, 0) });
+    p.push({ tex:M, prim: GEO.box(0.014,0.002,0.002,1), mat: mat(-0.057, 0.0045, -0.140, 0, -0.95, 0) });            // and its tongue
+    return p;
+  },
+  /* A page torn out of the ledger, folded once and dropped. Six of them
+     are somewhere in this house and together they are the whole story. */
+  ledgerItem(){
+    const p = [], P = 'paper';
+    p.push({ tex:P, prim: GEO.box(0.205,0.003,0.272,1), mat: mat(0.012, 0.0022, -0.008, 0, 0.30, 0), glow: 0.10 }); // the leaf under it
+    p.push({ tex:P, prim: GEO.box(0.216,0.004,0.152,1), mat: mat(0, 0.0060, 0.074, 0, 0.22, 0.012), glow: 0.12 });  // the lower half, flat
+    p.push({ tex:P, prim: GEO.box(0.216,0.004,0.150,1), mat: mat(-0.009, 0.0195, -0.062, 0.20, 0.22, 0.012), glow: 0.12 }); // and the half turned up on the fold
+    p.push({ tex:P, prim: GEO.box(0.214,0.004,0.014,1), mat: mat(-0.004, 0.0090, 0.000, 0, 0.22, 0), glow: 0.12 }); // the crease itself
+    p.push({ tex:'leatherPouch', prim: GEO.box(0.014,0.005,0.264,1), mat: mat(-0.100, 0.0070, 0.006, 0, 0.22, 0) });// the gum edge it was pulled off
+    for (let i=0;i<4;i++)                                                                                           // the stubs left in the binding
+      p.push({ tex:P, prim: GEO.box(0.020,0.003,0.026,1),
+               mat: mat(-0.114 - (i % 2)*0.006, 0.0088, -0.090 + i*0.060, 0, 0.22 + (i % 2)*0.3, 0), glow: 0.10 });
+    p.push({ tex:P, prim: GEO.box(0.062,0.003,0.048,1), mat: mat(0.104, 0.0150, 0.108, 0.55, 0.22, 0), glow: 0.12 });// the dog-eared corner
+    return p;
+  },
+  /* The cellar key: iron, not brass, and old enough that the ward is cut
+     rather than stamped. It turns every padlock inside the house.       */
+  cellarkeyItem(){
+    const p = [], I = 'rawIron';
+    p.push({ tex:I, prim: GEO.cyl(0.0075,0.0075,0.136,10), mat: mat(0.010, 0.0105, 0, 0,0, Math.PI/2), glow: 0.30 });   // the shank
+    p.push({ tex:I, prim: GEO.cyl(0.032,0.032,0.021,20,false,false), mat: mat(-0.082, 0.0105, 0), glow: 0.30 });        // the bow
+    p.push({ tex:I, prim: GEO.box(0.030,0.019,0.010,1), mat: mat(-0.082, 0.0105, 0), glow: 0.30 });                     // the bar across it
+    p.push({ tex:I, prim: GEO.box(0.010,0.019,0.030,1), mat: mat(-0.082, 0.0105, 0), glow: 0.30 });
+    p.push({ tex:I, prim: GEO.cyl(0.0105,0.0105,0.011,12), mat: mat(-0.046, 0.0105, 0, 0,0, Math.PI/2), glow: 0.30 });  // the collars
+    p.push({ tex:I, prim: GEO.cyl(0.0105,0.0105,0.011,12), mat: mat(0.050, 0.0105, 0, 0,0, Math.PI/2), glow: 0.30 });
+    p.push({ tex:I, prim: GEO.box(0.018,0.030,0.007,1), mat: mat(0.068, 0.0230, 0), glow: 0.30 });                      // the bit, standing off the shank
+    p.push({ tex:I, prim: GEO.box(0.007,0.016,0.007,1), mat: mat(0.078, 0.0330, 0), glow: 0.30 });                      // with the ward cut into it
+    p.push({ tex:I, prim: GEO.box(0.007,0.010,0.007,1), mat: mat(0.062, 0.0350, 0), glow: 0.30 });
+    p.push({ tex:I, prim: GEO.cyl(0.0060,0.0040,0.014,8), mat: mat(0.086, 0.0105, 0, 0,0, Math.PI/2), glow: 0.30 });    // the pin on the end
+    for (let i=0;i<4;i++)                                                                                               // the cord looped through the bow
+      p.push({ tex:'sackCloth', prim: GEO.cyl(0.0020,0.0020,0.024,6),
+               mat: mat(-0.112 - i*0.019, 0.0030 + Math.sin(i*1.1)*0.0018, 0.008 + i*0.007, 0,0, Math.PI/2) });
+    p.push({ tex:'paper', prim: GEO.box(0.044,0.002,0.030,1), mat: mat(-0.198, 0.0012, 0.032, 0, 0.42, 0), glow: 0.14 });// and the tag on the end of it
+    p.push({ tex:'sackCloth', prim: GEO.cyl(0.0055,0.0055,0.003,10,false,false), mat: mat(-0.180, 0.0022, 0.024), glow: 0.14 }); // the eyelet
+    return p;
+  }
+});
+
 
 
 /* ======================================================================
@@ -5531,7 +6062,31 @@ function buildWorld(){
     oilcan: compileModel(PROPS.oilcanItem()),
     hammer: compileModel(PROPS.hammerItem()),
     medkit: compileModel(PROPS.medkitItem()),
-    lockpick: compileModel(PROPS.lockpickItem())
+    lockpick: compileModel(PROPS.lockpickItem()),
+    /* ---- what you throw, and what you leave burning behind you ---- */
+    bottle: compileModel(PROPS.bottleItem()),
+    flare: compileModel(PROPS.flareItem()),
+    flareLit: compileModel(PROPS.flareLitItem()),
+    musicbox: compileModel(PROPS.musicboxItem()),
+    musicboxOpen: compileModel(PROPS.musicboxOpenItem()),
+    /* ---- what you put into yourself ---- */
+    bandage: compileModel(PROPS.bandageItem()),
+    adrenaline: compileModel(PROPS.adrenalineItem()),
+    laudanum: compileModel(PROPS.laudanumItem()),
+    /* ---- arms ---- */
+    nailgun: compileModel(PROPS.nailgunItem()),
+    nails: compileModel(PROPS.nailsItem()),
+    axe: compileModel(PROPS.axeItem()),
+    camera: compileModel(PROPS.cameraItem()),
+    plates: compileModel(PROPS.platesItem()),
+    /* ---- light, and the paper trail Elias left ---- */
+    lantern: compileModel(PROPS.lanternItem()),
+    watch: compileModel(PROPS.watchItem()),
+    ledger: compileModel(PROPS.ledgerItem()),
+    cellarkey: compileModel(PROPS.cellarkeyItem()),
+    /* ---- and what is left lying where you used something ---- */
+    bottleShards: compileModel(PROPS.bottleShardsItem()),
+    boxSet: compileModel(PROPS.musicboxOpenItem())
   };
 }
 
@@ -6200,11 +6755,17 @@ function startGame(){
   P.vx = P.vz = 0; P.crouch = 0; P.crouchT = 0;
   P.stam = 1; P.bat = 1; P.torch = true; P.fear = 0;
   P.fuses = 0; P.notes = 0; P.alive = true; P.powerOn = false;
-  P.has = { pistol: false, shotgun: false, hammer: false };
-  P.tools = { crowbar: false, cutters: false, screwdriver: false, oilcan: false, hammer: false, lockpick: false };
+  P.has = { pistol: false, shotgun: false, hammer: false, nailgun: false, axe: false, camera: false };
+  P.bottles = 0; P.flares = 0; P.boxes = 0; P.bandages = 0; P.adrenaline = 0; P.laudanum = 0;
+  P.adrenT = 0; P.laudT = 0; P.steady = 0; P.visible = 1;
+  P.bleed = 0; P.bleedT = 0; P.lantern = false;
+  P.hasWatch = false; P.ledger = 0;
+  THROWN.length = 0; LURES.length = 0; WARDS.length = 0; BLOODTRAIL.length = 0;
+  P.tools = { crowbar: false, cutters: false, screwdriver: false, oilcan: false, hammer: false,
+              lockpick: false, lantern: false, cellarkey: false };
   P.medkits = 0; P.boxOpen = false;
   P.door = { planks: 3, chained: true, oiled: false };
-  P.ammo = { pistol: 0, shotgun: 0 };
+  P.ammo = { pistol: 0, shotgun: 0, nails: 0, plates: 0 };
   P.weapon = null; P.traps = 0; P.hasKey = false; P.hits = 0;
   P.fireCool = 0; P.muzzle = 0; P.trapHurt = 0;
   P.clues = [null, null, null];
@@ -6214,7 +6775,7 @@ function startGame(){
   P.startTime = performance.now();
 
   V.x = spawn.villain.x; V.z = spawn.villain.y;
-  V.state = 'walk'; V.stun = 0; V.lastSeen = null; V.active = true; V.anim = 0;
+  V.state = 'walk'; V.stun = 0; V.lastSeen = null; V.active = true; V.anim = 0; V.busy = 0;
 
   // QA: put him in front of the camera down a clear line of sight
   if (QA === 2 || QA === 5 || QA === 6){
@@ -6299,6 +6860,7 @@ function updatePlayer(dt){
   P.sprinting = wantsRun && len > 0;
 
   let speed = crouching ? 1.35 : (P.sprinting ? 4.15 : 2.55);
+  speed *= moveScale();          // adrenaline drives you, a torn leg does not
   if (len > 0){
     mx /= len; mz /= len;
     tryMove(P.x + mx*speed*dt, P.z + mz*speed*dt);
@@ -6307,7 +6869,7 @@ function updatePlayer(dt){
   } else {
     P.moving = Math.max(0, P.moving - dt*6);
   }
-  P.bob = S.bob ? Math.sin(P.bobT) * (P.sprinting ? 0.055 : 0.028) * P.moving : 0;
+  P.bob = S.bob ? Math.sin(P.bobT) * (P.sprinting ? 0.055 : 0.028) * P.moving * (1 - (P.steady || 0) * 0.7) : 0;
 
   // footsteps
   if (len > 0){
@@ -6324,7 +6886,7 @@ function updatePlayer(dt){
   }
 
   // stamina + battery
-  P.stam = clamp01(P.stam + (P.sprinting ? -dt*0.30 : dt*0.16));
+  P.stam = clamp01(P.stam + ((P.sprinting && !(P.adrenT > 0)) ? -dt*0.30 : dt*0.16));
   updateNoise(dt);
   updateRoomUI(dt);
   if (P.torch) P.bat = clamp01(P.bat - dt*0.0105*D().bat);
@@ -6339,7 +6901,7 @@ function updatePlayer(dt){
   // heartbeat
   P.hbT = (P.hbT || 0) + dt;
   const hbPeriod = lerp(1.25, 0.42, P.fear);
-  if (P.fear > 0.12 && P.hbT > hbPeriod){ P.hbT = 0; SFX.heart(P.fear > 0.6); }
+  if (P.fear > 0.12 && P.hbT > hbPeriod){ P.hbT = 0; if (!(P.laudT > 0)) SFX.heart(P.fear > 0.6); }
 
   updateCombat(dt);
   scanNear();
@@ -6443,7 +7005,7 @@ function updateNoise(dt){
   // feet and room stack: talking while you run is the loudest thing in the house
   const loud = Math.max(NOISE.move, NOISE.mic, NOISE.step);
   const quiet = Math.min(Math.max(NOISE.move, NOISE.step), NOISE.mic);
-  NOISE.level = clamp01(loud + quiet * 0.55);
+  NOISE.level = clamp01((loud + quiet * 0.55) * noiseScale());
   if (NOISE.alertT > 0) NOISE.alertT -= dt;
   if (NOISE.flashT > 0) NOISE.flashT -= dt;
 
@@ -7033,6 +7595,559 @@ function useMedkit(){
   updateHUD();
 }
 
+/* ======================================================================
+   THE NEW ROSTER
+   ----------------------------------------------------------------------
+   Fifteen things you can pick up off the boards of Hollowmere House.
+   Three of them are answers to a man who hunts by ear: a bottle throws
+   your noise into another room, a flare puts light where he will not
+   walk, and a music box is forty-five seconds of something else to be
+   angry at. The rest keep you upright, or tell you who he was.
+
+   Paste this whole block in after useMedkit(). Nothing here reaches
+   into the Lodger himself - everything he is meant to react to goes
+   out through NOISE.heardAt, LURES, WARDS and V.busy.
+   ====================================================================== */
+
+/* ---- A. the sounds these things make ---- */
+
+SFX.bottleSmash = function(){
+  this.burst({ freq: 5200, q: 0.7, gain: 0.42, dur: 0.30, sweep: 1800 });
+  this.burst({ freq: 2400, q: 2.2, gain: 0.30, dur: 0.16, sweep: 900 });
+  this.tone({ type:'triangle', f0: 1900, f1: 240, dur: 0.22, gain: 0.14, att: 0.002 });
+  for (let i = 0; i < 5; i++)
+    setTimeout(() => this.burst({ freq: 3000 + Math.random()*3000, q: 8, gain: 0.06, dur: 0.07, sweep: 1200 }), 90 + i*70);
+};
+SFX.flareStrike = function(){
+  this.burst({ freq: 3400, q: 1.0, gain: 0.26, dur: 0.34, sweep: 700 });   // the cap dragged down the striker
+  this.burst({ freq: 900,  q: 0.6, gain: 0.20, dur: 1.60, sweep: 420, att: 0.14 }); // then it settles into a hiss
+  this.tone({ type:'sawtooth', f0: 160, f1: 90, dur: 0.5, gain: 0.08 });
+};
+SFX.musicBox = function(){
+  // eight notes of something a child was taught, wound too tight
+  const air = [880, 1046.5, 1174.7, 880, 783.99, 659.25, 783.99, 587.33];
+  air.forEach((f, i) => setTimeout(() => {
+    this.tone({ type:'triangle', f0: f, dur: 0.42, gain: 0.11, att: 0.004 });
+    this.tone({ type:'sine', f0: f*2, dur: 0.20, gain: 0.035 });
+  }, i*300));
+};
+SFX.nailShot = function(){
+  this.burst({ freq: 2200, q: 1.8, gain: 0.24, dur: 0.07, sweep: 700 });   // the driver, not a shot
+  this.burst({ freq: 420,  q: 1.4, gain: 0.18, dur: 0.13, sweep: 120 });
+  this.tone({ type:'square', f0: 1400, f1: 300, dur: 0.06, gain: 0.09, att: 0.001 });
+};
+SFX.axeSwing = function(){
+  this.burst({ freq: 520, q: 0.7, gain: 0.22, dur: 0.24, sweep: 130 });
+  this.tone({ type:'sine', f0: 300, f1: 90, dur: 0.22, gain: 0.07 });
+};
+SFX.cameraFlash = function(){
+  this.burst({ freq: 6000, q: 0.5, gain: 0.34, dur: 0.09, sweep: 2200 });  // the powder going up
+  this.burst({ freq: 1200, q: 1.2, gain: 0.16, dur: 0.55, sweep: 300, att: 0.02 });
+  this.tone({ type:'square', f0: 240, f1: 120, dur: 0.10, gain: 0.08 });   // the shutter after it
+};
+SFX.syringe = function(){
+  this.burst({ freq: 3600, q: 6, gain: 0.09, dur: 0.10, sweep: 1600 });
+  this.tone({ type:'sine', f0: 90, f1: 220, dur: 0.9, gain: 0.10, att: 0.30 });
+};
+SFX.glug = function(){
+  for (let i = 0; i < 3; i++)
+    setTimeout(() => this.tone({ type:'sine', f0: 300 - i*40, f1: 120, dur: 0.16, gain: 0.10 }), i*190);
+  this.burst({ freq: 700, q: 3, gain: 0.06, dur: 0.6, sweep: 260 });
+};
+SFX.lanternLight = function(){
+  this.burst({ freq: 2800, q: 5, gain: 0.10, dur: 0.09, sweep: 900 });     // the flint wheel
+  this.burst({ freq: 500, q: 0.9, gain: 0.10, dur: 0.9, sweep: 260, att: 0.10 }); // the wick catching
+};
+SFX.watchTick = function(){
+  for (let i = 0; i < 6; i++)
+    setTimeout(() => this.tone({ type:'square', f0: 2600, f1: 1400, dur: 0.02, gain: 0.05 }), i*500);
+};
+
+/* ---- B. the new arms ---- */
+
+WEAPONS.nailgun = {
+  name: 'Nail gun', ammoKey: 'nails', label: 'Nail gun',
+  stun: 8, range: 14, cone: 0.10, rof: 0.55, kick: 0.035, flash: 0.22,
+  noise: 0.42, shots: 1,
+  fire(){ SFX.nailShot(); }
+};
+WEAPONS.axe = {
+  name: 'Fire axe', ammoKey: 'melee', label: 'Fire axe', melee: true,
+  stun: 11, range: 2.4, cone: 0.95, rof: 1.05, kick: 0.06, flash: 0.0,
+  noise: 0.55,
+  fire(){ SFX.axeSwing(); }
+};
+WEAPONS.camera = {
+  name: 'Plate camera', ammoKey: 'plates', label: 'Plate camera',
+  stun: 7, range: 8, cone: 0.65, rof: 1.6, kick: 0.01, flash: 0.95,
+  noise: 0.30, shots: 1,
+  fire(){ SFX.cameraFlash(); }
+};
+
+/* ---- C. what the prompt says when you stand over one ---- */
+
+Object.assign(ITEMLABEL, {
+  bottle: '[E] Take the bottle', flare: '[E] Take the road flare',
+  musicbox: '[E] Take the music box', bandage: '[E] Take the field dressing',
+  adrenaline: '[E] Take the syringe', laudanum: '[E] Take the laudanum',
+  nailgun: '[E] Take the nail gun', nails: '[E] Take the box of nails',
+  axe: '[E] Take the fire axe', camera: '[E] Take the plate camera',
+  plates: '[E] Take the camera plates', lantern: '[E] Take the oil lantern',
+  watch: '[E] Take the wristwatch', ledger: '[E] Read the ledger page',
+  cellarkey: '[E] Take the cellar key'
+});
+
+
+
+function openLedger(i){
+  const n = LEDGER[i % LEDGER.length];
+  el('noteTitle').textContent = n.t;
+  el('noteMeta').textContent = n.m;
+  el('noteBody').innerHTML = n.b.map(p => '<p class="body">' + p + '</p>').join('');
+  setMode('note');
+}
+
+/* ---- D. what each one does when you take it ---- */
+/* interact() calls updateHUD() the moment these return - do not call it here */
+
+Object.assign(ITEMPICK, {
+  bottle(it){
+    it.live = false; P.bottles = (P.bottles | 0) + 1; SFX.pickup();
+    subtitle('An empty bottle, green and thick at the base. [T] throws it. He goes where it lands, not where you are.');
+  },
+  flare(it){
+    it.live = false; P.flares = (P.flares | 0) + 1; SFX.pickup();
+    subtitle('A road flare, cap still sealed. [R] strikes it and throws it. He will not walk into red light.');
+  },
+  musicbox(it){
+    it.live = false; P.boxes = (P.boxes | 0) + 1; SFX.pickup();
+    subtitle('A wind-up music box with a cracked lid. [M] sets it playing. It buys you the time it takes him to break it.');
+  },
+  bandage(it){
+    it.live = false; P.bandages = (P.bandages | 0) + 1; SFX.pickup();
+    subtitle('A field dressing in a waxed paper packet. [B] stops the bleeding. Bleeding is a trail.');
+  },
+  adrenaline(it){
+    it.live = false; P.adrenaline = (P.adrenaline | 0) + 1; SFX.pickup();
+    subtitle('A syringe of adrenaline. [X]. Eighteen seconds of running forever, and every one of them loud.');
+  },
+  laudanum(it){
+    it.live = false; P.laudanum = (P.laudanum | 0) + 1; SFX.pickup();
+    subtitle('A bottle of laudanum, three fingers left. [V] takes the fear out of your hands for half a minute.');
+  },
+  nailgun(it){
+    it.live = false; P.has.nailgun = true; P.ammo.nails = (P.ammo.nails | 0) + 12; SFX.pickup(); SFX.clunk();
+    equipWeapon('nailgun');
+    subtitle('A framing nail gun off the workbench. Twelve in the strip. It hardly makes a sound - that is the point. [5]');
+  },
+  nails(it){
+    it.live = false; P.ammo.nails = (P.ammo.nails | 0) + 12; SFX.pickup();
+    subtitle('A box of framing nails, twelve to a strip.');
+  },
+  axe(it){
+    it.live = false; P.has.axe = true; SFX.pickup(); SFX.clunk();
+    equipWeapon('axe');
+    subtitle('A fire axe off the wall bracket. Heavy, slow, and it folds him for eleven seconds. [6]');
+  },
+  camera(it){
+    it.live = false; P.has.camera = true; P.ammo.plates = (P.ammo.plates | 0) + 3; SFX.pickup(); SFX.rack();
+    equipWeapon('camera');
+    subtitle('A plate camera with a magnesium flash. Three plates. Light hurts him, and light does not tell him where you stood. [7]');
+  },
+  plates(it){
+    it.live = false; P.ammo.plates = (P.ammo.plates | 0) + 3; SFX.pickup();
+    subtitle('Three camera plates in a light-tight sleeve.');
+  },
+  lantern(it){
+    it.live = false; P.tools.lantern = true; SFX.pickup();
+    subtitle('An oil lantern, half full and still trimmed. [L] lights it. It will show you the whole room, and you to the whole room.');
+  },
+  watch(it){
+    it.live = false; P.hasWatch = true; SFX.pickup(); SFX.watchTick(); SFX.chord();
+    subtitle('Elias\u2019s wristwatch. The strap is broken and it is still running. You put it on and start counting.');
+    setObjective(objectiveNow());
+  },
+  ledger(it){
+    it.live = false; P.ledger = (P.ledger | 0) + 1; SFX.pickup();
+    openLedger(it.idx | 0);
+  },
+  cellarkey(it){
+    it.live = false; P.tools.cellarkey = true; SFX.pickup(); SFX.clunk();
+    subtitle('A cellar key on a loop of wire. It turns every padlock in this house, which tells you who fitted them.');
+    setObjective(objectiveNow());
+  }
+});
+
+/* ======================================================================
+   E. THINGS IN THE AIR, THINGS ON THE FLOOR
+   ----------------------------------------------------------------------
+   THROWN holds everything the player has let go of: bottles mid-arc,
+   flares burning down, music boxes playing themselves out, and the
+   ringing echo a smashed bottle leaves behind in a room.
+
+   Two flat arrays hang off it for the Lodger to read. They are REBUILT
+   FROM SCRATCH every frame by updateThrown, so never hold a reference
+   to an entry - hold the array itself, it is never replaced.
+
+     LURES  [{ x, z, until, kind }]   somewhere he should walk to.
+                                      kind 'noise' - a smashed bottle, a
+                                      drop of your blood on the boards.
+                                      kind 'box'   - a music box playing.
+     WARDS  [{ x, z, until, r }]      a burning flare. He must not enter
+                                      the circle of radius r. He veers
+                                      off and works his way around it.
+
+   IMPORTANT: 'until' is SECONDS OF LIFE REMAINING, counted down here -
+   not a timestamp. An entry is live while until > 0. Nothing else needs
+   a clock, and nothing keeps burning while the game is paused.
+
+   V.busy is the third channel: seconds during which the Lodger is doing
+   something other than looking for you. Set to 6 when he reaches a music
+   box. The AI must not move, hunt or lunge while V.busy > 0.
+   ====================================================================== */
+
+const THROWN = [];
+const LURES = [];
+const WARDS = [];
+const EXTRALIGHTS = [];
+
+/* every drop of you that hits the boards is a mark on his map */
+const BLOODTRAIL = [];
+
+/* everything you do is louder with a syringe in you */
+function noiseScale(){ return (P.adrenT > 0) ? 1.30 : 1.0; }
+
+/* one place for "he heard that, and he heard it THERE" */
+function makeNoise(level, seconds, cx, cz){
+  NOISE.level = Math.max(NOISE.level, clamp01(level * noiseScale()));
+  NOISE.alertT = Math.max(NOISE.alertT, seconds);
+  NOISE.heardAt = { x: Math.floor(cx), y: Math.floor(cz) };
+  NOISE.flashT = 0.5;
+}
+
+/* the syringe in your leg and the blood coming out of it */
+function moveScale(){
+  return (1 + ((P.adrenT > 0) ? 0.22 : 0)) * (1 - Math.min(0.28, (P.bleed || 0) * 0.28));
+}
+
+/* a bottle leaves your hand at chest height and does the rest itself */
+function updateThrown(dt){
+  for (let i = THROWN.length - 1; i >= 0; i--){
+    const t = THROWN[i];
+
+    if (t.kind === 'bottle' || (t.kind === 'flare' && t.state === 'fly')){
+      // four sub-steps, or a hard throw goes straight through a wall
+      let landed = false;
+      for (let s = 0; s < 4 && !landed; s++){
+        const h = dt / 4;
+        t.vy -= 9.8 * h;
+        const nx = t.x + t.vx * h, ny = t.y + t.vy * h, nz = t.z + t.vz * h;
+        if (ny <= 0.05 || solid(Math.floor(nx), Math.floor(nz))){
+          landed = true;
+          if (!solid(Math.floor(nx), Math.floor(nz))){ t.x = nx; t.z = nz; }
+          t.y = 0.05;
+        } else { t.x = nx; t.y = ny; t.z = nz; }
+      }
+      t.spin += dt * 9;
+      if (landed){
+        if (t.kind === 'bottle'){
+          SFX.bottleSmash();
+          // the whole point of the thing: the noise happens over THERE
+          makeNoise(0.82, 2.4, t.x, t.z);
+          THROWN.splice(i, 1);
+          THROWN.push({ kind:'echo', x: t.x, z: t.z, life: 7.0 });
+          items.push({ type:'bottleShards', x: t.x, y: t.z, live: true, noPick: true, bob: rng()*6.28 });
+        } else {
+          t.state = 'burn';
+          t.vx = t.vy = t.vz = 0;
+          makeNoise(0.22, 0.8, t.x, t.z);
+        }
+      }
+      continue;
+    }
+
+    if (t.kind === 'flare'){
+      t.life -= dt;
+      if (t.life <= 0){
+        THROWN.splice(i, 1);
+        subtitle('The flare gutters out. The red goes off the walls all at once.');
+      }
+      continue;
+    }
+
+    if (t.kind === 'box'){
+      // he walks to it, and then he spends six seconds taking it apart
+      if (t.smashT > 0){
+        t.smashT -= dt;
+        V.busy = Math.max(V.busy || 0, t.smashT);
+        if (t.smashT <= 0){
+          SFX.crunch();
+          THROWN.splice(i, 1);
+          subtitle('The music stops in the middle of a bar.');
+        }
+        continue;
+      }
+      t.life -= dt;
+      t.chime -= dt;
+      if (t.chime <= 0){ t.chime = 2.6; SFX.musicBox(); }
+      if (V.active && V.stun <= 0 && Math.hypot(V.x - t.x, V.z - t.z) < 0.85){
+        t.smashT = 6.0;
+        V.busy = 6.0;
+        SFX.growl();
+        subtitle('He has found it. He is on his knees over it with both hands.');
+      }
+      if (t.life <= 0){ THROWN.splice(i, 1); }
+      continue;
+    }
+
+    // an echo is a place a sound was, and nothing else
+    t.life -= dt;
+    if (t.life <= 0) THROWN.splice(i, 1);
+  }
+
+  // project it all down to the two arrays the Lodger reads
+  LURES.length = 0;
+  WARDS.length = 0;
+  for (const t of THROWN){
+    if (t.kind === 'echo') LURES.push({ x: t.x, z: t.z, until: t.life, kind: 'noise' });
+    else if (t.kind === 'box' && t.smashT <= 0) LURES.push({ x: t.x, z: t.z, until: t.life, kind: 'box' });
+    else if (t.kind === 'flare' && t.state === 'burn') WARDS.push({ x: t.x, z: t.z, until: t.life, r: 3.4 });
+  }
+  for (const d of BLOODTRAIL) LURES.push({ x: d.x, z: d.z, until: d.life, kind: 'noise' });
+}
+
+/* the syringe, the laudanum, the lantern and the bleeding, per frame */
+function updateBoons(dt){
+  if (P.adrenT > 0){
+    P.adrenT = Math.max(0, P.adrenT - dt);
+    if (P.adrenT === 0) subtitle('The syringe wears off all at once. Your legs come back to you heavier than they went.');
+  }
+  if (P.laudT > 0){
+    P.laudT = Math.max(0, P.laudT - dt);
+    // fear falls away twice as fast and is not allowed above the cap
+    P.fear = Math.max(0, P.fear - dt * 0.6);
+    if (P.fear > 0.45) P.fear = 0.45;
+    if (P.laudT === 0) subtitle('The laudanum lets go of you, and the house comes back at full volume.');
+  }
+  // the camera stops shaking while the bottle is in you
+  P.steady = (P.laudT > 0) ? 1 : Math.max(0, (P.steady || 0) - dt * 2);
+
+  // a lit lantern is the easiest thing in this house to see
+  P.visible = P.lantern ? 1.85 : 1.0;
+
+  if ((P.bleed || 0) > 0){
+    P.bleedT = (P.bleedT || 0) - dt;
+    if (P.bleedT <= 0){
+      P.bleedT = 1.6;
+      BLOODTRAIL.push({ x: P.x, z: P.z, life: 14.0 });
+      if (BLOODTRAIL.length > 24) BLOODTRAIL.shift();
+    }
+  }
+  for (let i = BLOODTRAIL.length - 1; i >= 0; i--){
+    BLOODTRAIL[i].life -= dt;
+    if (BLOODTRAIL[i].life <= 0) BLOODTRAIL.splice(i, 1);
+  }
+
+  if (V.busy > 0) V.busy = Math.max(0, V.busy - dt);
+}
+
+/* burning flares and a lit lantern, handed to the renderer as point lights */
+function extraLights(){
+  EXTRALIGHTS.length = 0;
+  for (const t of THROWN){
+    if (t.kind !== 'flare' || t.state !== 'burn') continue;
+    const fl = 0.80 + Math.sin(performance.now()/70 + t.x*3) * 0.20;
+    EXTRALIGHTS.push({ x: t.x, y: 0.18, z: t.z, r: 7.0, cr: 1.10*fl, cg: 0.18*fl, cb: 0.07*fl });
+  }
+  if (P.lantern)
+    EXTRALIGHTS.push({ x: P.x, y: 1.20, z: P.z, r: 8.5, cr: 0.72, cg: 0.56, cb: 0.32 });
+  return EXTRALIGHTS;
+}
+
+/* ---- F. using the things ---- */
+
+function throwBottle(){
+  if (MODE !== 'play' || !P.alive) return;
+  if (P.hidden){ subtitle('Not from in here.'); return; }
+  if (!(P.bottles > 0)){ subtitle('No bottles left.'); return; }
+  P.bottles--;
+  const fx = Math.cos(P.ang), fz = Math.sin(P.ang);
+  const up = Math.sin(P.pitch || 0);
+  THROWN.push({
+    kind:'bottle', x: P.x + fx*0.35, y: lerp(1.50, 0.95, P.crouch), z: P.z + fz*0.35,
+    vx: fx*9.5, vy: 2.6 + up*6.0, vz: fz*9.5, spin: rng()*6.28, life: 9
+  });
+  SFX.swing();
+  subtitle('It goes end over end into the dark. Wait for it.');
+  updateHUD();
+}
+
+function strikeFlare(){
+  if (MODE !== 'play' || !P.alive) return;
+  if (P.hidden){ subtitle('Not from in here.'); return; }
+  if (!(P.flares > 0)){ subtitle('No flares left.'); return; }
+  P.flares--;
+  const fx = Math.cos(P.ang), fz = Math.sin(P.ang);
+  const up = Math.sin(P.pitch || 0);
+  THROWN.push({
+    kind:'flare', state:'fly', x: P.x + fx*0.35, y: lerp(1.45, 0.95, P.crouch), z: P.z + fz*0.35,
+    vx: fx*7.0, vy: 2.2 + up*5.0, vz: fz*7.0, spin: rng()*6.28, life: 35.0
+  });
+  SFX.flareStrike();
+  flashAmt = Math.max(flashAmt, 0.22);
+  subtitle('Thirty-five seconds of red. He will not come through it - but he will come around it.');
+  updateHUD();
+}
+
+function placeMusicBox(){
+  if (MODE !== 'play' || !P.alive || P.hidden) return;
+  if (!(P.boxes > 0)){ subtitle('No music boxes left.'); return; }
+  for (const t of THROWN)
+    if (t.kind === 'box' && Math.hypot(t.x - P.x, t.z - P.z) < 1.0){
+      subtitle('There is already one playing here.'); return;
+    }
+  P.boxes--;
+  THROWN.push({ kind:'box', x: P.x, z: P.z, life: 45.0, chime: 0.0, smashT: 0 });
+  items.push({ type:'boxSet', x: P.x, y: P.z, live: true, noPick: true, bob: P.ang });
+  SFX.clunk();
+  makeNoise(0.30, 1.2, P.x, P.z);
+  subtitle('Wound to the stop and set down on the boards. Now get away from it.');
+  updateHUD();
+}
+
+function useBandage(){
+  if (MODE !== 'play' || !P.alive) return;
+  if (!(P.bandages > 0)){ subtitle('Nothing left to wrap it with.'); return; }
+  if (!((P.bleed || 0) > 0) && P.trapHurt <= 0){ subtitle('You are not bleeding. Keep it for when you are.'); return; }
+  P.bandages--;
+  P.bleed = 0;
+  P.bleedT = 0;
+  P.trapHurt = 0;
+  BLOODTRAIL.length = 0;
+  SFX.pickup();
+  subtitle('Wadded, wrapped and pulled tight. You stop leaving a line of yourself behind.');
+  updateHUD();
+}
+
+function useAdrenaline(){
+  if (MODE !== 'play' || !P.alive) return;
+  if (!(P.adrenaline > 0)){ subtitle('No syringes left.'); return; }
+  if (P.adrenT > 0){ subtitle('There is already one in you.'); return; }
+  P.adrenaline--;
+  P.adrenT = 18.0;
+  P.stam = 1;
+  SFX.syringe();
+  flashAmt = Math.max(flashAmt, 0.18);
+  subtitle('Straight into the thigh. Eighteen seconds where your legs do not argue - and every step twice as loud.');
+  updateHUD();
+}
+
+function useLaudanum(){
+  if (MODE !== 'play' || !P.alive) return;
+  if (!(P.laudanum > 0)){ subtitle('The bottle is empty.'); return; }
+  if (P.laudT > 0){ subtitle('You can still taste the last of it.'); return; }
+  P.laudanum--;
+  P.laudT = 30.0;
+  P.steady = 1;
+  SFX.glug();
+  subtitle('Bitter, and then nothing is quite as close as it was. Thirty seconds of not caring.');
+  updateHUD();
+}
+
+function toggleLantern(){
+  if (MODE !== 'play' || !P.alive) return;
+  if (!P.tools.lantern){ subtitle('You have no lantern.'); return; }
+  P.lantern = !P.lantern;
+  if (P.lantern){
+    SFX.lanternLight();
+    subtitle('The wick catches and the whole room arrives at once. So do you, to him.');
+  } else {
+    SFX.burst({ freq: 900, q: 2, gain: 0.07, dur: 0.10, sweep: 300 });
+    subtitle('You pinch the wick out and let the dark come back.');
+  }
+  updateHUD();
+}
+
+/* ======================================================================
+   G. INPUT - add these inside the existing keydown handler, in the
+   MODE === 'play' block, immediately after the line `if (k === 'keyg')
+   placeTrap();` (index.html line 8127).
+   ======================================================================
+
+  if (k === 'digit5') equipWeapon('nailgun');
+  if (k === 'digit6') equipWeapon('axe');
+  if (k === 'digit7') equipWeapon('camera');
+  if (k === 'keyt') throwBottle();
+  if (k === 'keyr') strikeFlare();
+  if (k === 'keym') placeMusicBox();
+  if (k === 'keyb') useBandage();
+  if (k === 'keyx') useAdrenaline();
+  if (k === 'keyv') useLaudanum();
+  if (k === 'keyl') toggleLantern();
+
+   And the Q cycle at line 8130 becomes:
+
+    const order = [null, 'pistol', 'shotgun', 'hammer', 'nailgun', 'axe', 'camera'].filter(w => w === null || P.has[w]);
+
+   equipWeapon itself needs no change - it already gates on P.has[w],
+   and P.has.nailgun / P.has.axe / P.has.camera are set by the pickups.
+   ====================================================================== */
+
+/* ======================================================================
+   H. startGame - the inventory reset. Replace the three lines at
+   index.html 6178-6183 with these, and add the four after them.
+   ======================================================================
+
+  P.has = { pistol: false, shotgun: false, hammer: false, nailgun: false, axe: false, camera: false };
+  P.tools = { crowbar: false, cutters: false, screwdriver: false, oilcan: false, hammer: false,
+              lockpick: false, lantern: false, cellarkey: false };
+  P.ammo = { pistol: 0, shotgun: 0, nails: 0, plates: 0 };
+  P.bottles = 0; P.flares = 0; P.boxes = 0; P.bandages = 0; P.adrenaline = 0; P.laudanum = 0;
+  P.adrenT = 0; P.laudT = 0; P.steady = 0; P.visible = 1;
+  P.bleed = 0; P.bleedT = 0; P.lantern = false;
+  P.hasWatch = false; P.ledger = 0;
+  THROWN.length = 0; LURES.length = 0; WARDS.length = 0; BLOODTRAIL.length = 0;
+
+   and beside `V.state = 'walk'; V.stun = 0; ...` at line 6192:
+
+  V.busy = 0;
+   ====================================================================== */
+
+/* ======================================================================
+   I. updateHUD - the new rows. Paste them into the armory block after
+   the line `if (P.medkits) rows.push(...)` (index.html line 7246) and
+   before `const kit = [];`.
+   ======================================================================
+
+    if (P.has.nailgun && P.weapon !== 'nailgun') rows.push('&nbsp;&nbsp; Nail gun ' + (P.ammo.nails|0) + '  [5]');
+    if (P.has.axe && P.weapon !== 'axe') rows.push('&nbsp;&nbsp; Fire axe  [6]');
+    if (P.has.camera && P.weapon !== 'camera') rows.push('&nbsp;&nbsp; Plate camera ' + (P.ammo.plates|0) + '  [7]');
+    if (P.bottles) rows.push('&nbsp;&nbsp; Bottles ' + P.bottles + '  [T]');
+    if (P.flares) rows.push('&nbsp;&nbsp; Road flares ' + P.flares + '  [R]');
+    if (P.boxes) rows.push('&nbsp;&nbsp; Music boxes ' + P.boxes + '  [M]');
+    if (P.bandages) rows.push('&nbsp;&nbsp; Dressings ' + P.bandages + '  [B]');
+    if (P.adrenaline) rows.push('&nbsp;&nbsp; Syringes ' + P.adrenaline + '  [X]');
+    if (P.laudanum) rows.push('&nbsp;&nbsp; Laudanum ' + P.laudanum + '  [V]');
+    if (P.tools.lantern) rows.push('&nbsp;&nbsp; Lantern ' + (P.lantern ? 'lit' : 'out') + '  [L]');
+    if (P.adrenT > 0) rows.push('&nbsp;&nbsp; Adrenaline ' + Math.ceil(P.adrenT) + 's');
+    if (P.laudT > 0) rows.push('&nbsp;&nbsp; Laudanum ' + Math.ceil(P.laudT) + 's');
+    if (P.bleed > 0) rows.push('&nbsp;&nbsp; Bleeding');
+    if (P.ledger) rows.push('&nbsp;&nbsp; Ledger pages ' + P.ledger + ' / ' + LEDGER.length);
+    if (P.hasWatch) rows.push('&nbsp;&nbsp; ' + watchTime());
+
+   and two lines inside the kit block, beside the other tools:
+
+    if (P.tools.cellarkey) kit.push('cellar key');
+    if (P.tools.lantern) kit.push('lantern');
+   ====================================================================== */
+
+/* what Elias's watch says, once you are wearing it */
+function watchTime(){
+  const secs = Math.max(0, Math.round((performance.now() - P.startTime)/1000));
+  return Math.floor(secs/60) + ':' + String(secs % 60).padStart(2, '0');
+}
+
+
 /* what the front door still needs, in the order you have to do it */
 function doorStage(){
   if (!P.door) return 'out';
@@ -7269,12 +8384,29 @@ function updateHUD(){
       rows.push('&nbsp;&nbsp; Code ' + P.clues.map(c => c || '?').join(''));
     if (P.hasKey) rows.push('&nbsp;&nbsp; Front door key');
     if (P.medkits) rows.push('&nbsp;&nbsp; First aid ' + P.medkits + '  [H]');
+    if (P.has.nailgun && P.weapon !== 'nailgun') rows.push('&nbsp;&nbsp; Nail gun ' + (P.ammo.nails|0) + '  [5]');
+    if (P.has.axe && P.weapon !== 'axe') rows.push('&nbsp;&nbsp; Fire axe  [6]');
+    if (P.has.camera && P.weapon !== 'camera') rows.push('&nbsp;&nbsp; Plate camera ' + (P.ammo.plates|0) + '  [7]');
+    if (P.bottles) rows.push('&nbsp;&nbsp; Bottles ' + P.bottles + '  [T]');
+    if (P.flares) rows.push('&nbsp;&nbsp; Road flares ' + P.flares + '  [R]');
+    if (P.boxes) rows.push('&nbsp;&nbsp; Music boxes ' + P.boxes + '  [M]');
+    if (P.bandages) rows.push('&nbsp;&nbsp; Dressings ' + P.bandages + '  [B]');
+    if (P.adrenaline) rows.push('&nbsp;&nbsp; Syringes ' + P.adrenaline + '  [X]');
+    if (P.laudanum) rows.push('&nbsp;&nbsp; Laudanum ' + P.laudanum + '  [V]');
+    if (P.tools.lantern) rows.push('&nbsp;&nbsp; Lantern ' + (P.lantern ? 'lit' : 'out') + '  [L]');
+    if (P.adrenT > 0) rows.push('&nbsp;&nbsp; Adrenaline ' + Math.ceil(P.adrenT) + 's');
+    if (P.laudT > 0) rows.push('&nbsp;&nbsp; Laudanum ' + Math.ceil(P.laudT) + 's');
+    if (P.bleed > 0) rows.push('&nbsp;&nbsp; Bleeding');
+    if (P.ledger) rows.push('&nbsp;&nbsp; Ledger pages ' + P.ledger + ' / ' + LEDGER.length);
+    if (P.hasWatch) rows.push('&nbsp;&nbsp; ' + watchTime());
     const kit = [];
     if (P.tools.crowbar) kit.push('crowbar');
     if (P.tools.cutters) kit.push('cutters');
     if (P.tools.screwdriver) kit.push('screwdriver');
     if (P.tools.oilcan) kit.push('oil can');
     if (P.tools.lockpick) kit.push('picks');
+    if (P.tools.cellarkey) kit.push('cellar key');
+    if (P.tools.lantern) kit.push('lantern');
     if (kit.length) rows.push('&nbsp;&nbsp; Kit: ' + kit.join(', '));
     arm.innerHTML = rows.join('<br/>');
   }
@@ -7765,9 +8897,16 @@ function eachDrawable(cb){
     const t = performance.now()/1000;
     const mdl = WORLD.itemModels[it.type];
     if (!mdl) continue;
-    const flat = it.type === 'note' || it.type === 'clue' || it.type === 'trapSet';
-    const heavy = it.type === 'shotgun' || it.type === 'pistol' || it.type === 'trap';
-    const yy = flat ? (it.type === 'trapSet' ? 0.004 : 0.02)
+    const flat = it.type === 'note' || it.type === 'clue' || it.type === 'trapSet' ||
+                 it.type === 'ledger' || it.type === 'bandage' || it.type === 'plates' ||
+                 it.type === 'flareLit' || it.type === 'musicboxOpen' ||
+                 it.type === 'bottleShards' || it.type === 'boxSet';
+    const heavy = it.type === 'shotgun' || it.type === 'pistol' || it.type === 'trap' ||
+                  it.type === 'nailgun' || it.type === 'axe' || it.type === 'camera' ||
+                  it.type === 'lantern' || it.type === 'musicbox';
+    const grounded = it.type === 'trapSet' || it.type === 'flareLit' || it.type === 'musicboxOpen' ||
+                     it.type === 'bottleShards' || it.type === 'boxSet';
+    const yy = flat ? (grounded ? 0.004 : 0.02)
                     : (heavy ? 0.10 : 0.15) + Math.sin(t*1.6 + it.bob) * (heavy ? 0.018 : 0.035);
     M4.trs(itemMat, it.x, yy, it.y, 0, flat ? it.bob : t*(heavy ? 0.45 : 0.8) + it.bob, 0, 1,1,1);
     for (const part of mdl) cb(part.mesh, itemMat, part.tex, part.glow);
@@ -7973,21 +9112,33 @@ function renderFrame(dt){
     gl.bindTexture(gl.TEXTURE_2D, shadowRT.tex);
   }
 
-  // nearest ceiling lamps once the power is back
+  /* Six point lights, filled nearest-first: anything you have set burning
+     goes in before the ceiling bulbs, because a road flare on the boards at
+     your feet matters more to the frame than a bulb two rooms away. */
   let nl = 0;
-  if (P.powerOn){
-    const sorted = WORLD.lamps
-      .map(l => ({ l, d: (l.x-P.x)*(l.x-P.x) + (l.z-P.z)*(l.z-P.z) }))
-      .sort((a,b) => a.d - b.d).slice(0, 6);
-    const pos = new Float32Array(24), col = new Float32Array(18);
-    for (const e of sorted){
-      const fl = 0.86 + Math.sin(performance.now()/500 + e.l.x)*0.06;
-      pos[nl*4] = e.l.x; pos[nl*4+1] = e.l.y; pos[nl*4+2] = e.l.z; pos[nl*4+3] = 7.0;
-      col[nl*3] = 0.62*fl; col[nl*3+1] = 0.50*fl; col[nl*3+2] = 0.34*fl;
-      nl++;
+  {
+    const cand = [];
+    for (const e of extraLights())
+      cand.push({ x:e.x, y:e.y, z:e.z, r:e.r, cr:e.cr, cg:e.cg, cb:e.cb,
+                  d: (e.x-P.x)*(e.x-P.x) + (e.z-P.z)*(e.z-P.z) - 400 });
+    if (P.powerOn){
+      for (const l of WORLD.lamps){
+        const fl = 0.86 + Math.sin(performance.now()/500 + l.x)*0.06;
+        cand.push({ x:l.x, y:l.y, z:l.z, r:7.0, cr:0.62*fl, cg:0.50*fl, cb:0.34*fl,
+                    d: (l.x-P.x)*(l.x-P.x) + (l.z-P.z)*(l.z-P.z) });
+      }
     }
-    gl.uniform4fv(m.u.uLightPos, pos);
-    gl.uniform3fv(m.u.uLightCol, col);
+    if (cand.length){
+      cand.sort((a,b) => a.d - b.d);
+      const pos = new Float32Array(24), col = new Float32Array(18);
+      for (const e of cand.slice(0, 6)){
+        pos[nl*4] = e.x; pos[nl*4+1] = e.y; pos[nl*4+2] = e.z; pos[nl*4+3] = e.r;
+        col[nl*3] = e.cr; col[nl*3+1] = e.cg; col[nl*3+2] = e.cb;
+        nl++;
+      }
+      gl.uniform4fv(m.u.uLightPos, pos);
+      gl.uniform3fv(m.u.uLightCol, col);
+    }
   }
   gl.uniform1i(m.u.uNumLights, nl);
 
@@ -8104,6 +9255,10 @@ function loop(now){
 
   if (MODE === 'play'){
     updatePlayer(dt);
+    /* the things you have let go of, then whatever is still running in your
+       blood - both before the Lodger reads them */
+    updateThrown(dt);
+    updateBoons(dt);
     updateVillain(dt);
     updateDoors(dt);
     ambience(dt);
@@ -8156,9 +9311,19 @@ addEventListener('keydown', e => {
   if (k === 'digit4') equipWeapon('hammer');
   if (k === 'keyh') useMedkit();
   if (k === 'keyg') placeTrap();
+  if (k === 'digit5') equipWeapon('nailgun');
+  if (k === 'digit6') equipWeapon('axe');
+  if (k === 'digit7') equipWeapon('camera');
+  if (k === 'keyt') throwBottle();
+  if (k === 'keyr') strikeFlare();
+  if (k === 'keym') placeMusicBox();
+  if (k === 'keyb') useBandage();
+  if (k === 'keyx') useAdrenaline();
+  if (k === 'keyv') useLaudanum();
+  if (k === 'keyl') toggleLantern();
   if (k === 'keyq'){
     // quick swap between whatever you are carrying
-    const order = [null, 'pistol', 'shotgun', 'hammer'].filter(w => w === null || P.has[w]);
+    const order = [null, 'pistol', 'shotgun', 'hammer', 'nailgun', 'axe', 'camera'].filter(w => w === null || P.has[w]);
     const i = order.indexOf(P.weapon);
     equipWeapon(order[(i + 1) % order.length]);
   }
