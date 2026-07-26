@@ -37,7 +37,7 @@ const server = http.createServer((req, res) => {
     const T = (name, fn) => { try { const r = fn(); log.push(name + ' -> ' + (r === undefined ? 'ok' : r)); } catch (e) { errs.push(name + ': ' + e.message + ' @ ' + String(e.stack).split('\n')[1]); } };
     // the Lodger will happily kill the player halfway through a mechanical
     // test; put the world back on its feet between sections
-    const resume = () => { setMode('play'); P.alive = true; P.fadeOut = 0; V.stun = 0; };
+    const resume = () => { setMode('play'); P.alive = true; P.fadeOut = 0; V.stun = 0; V.active = true; V.busy = 0; };
     const frames = n => { for (let i = 0; i < n; i++) { try { updateThrown(0.05); updateBoons(0.05); updateVillain(0.05); updateCombat(0.05); updateDoors(0.05); updateNoise(0.05); } catch (e) { errs.push('tick: ' + e.message); break; } } };
 
     // 1. every declared item model must compile and be registered
@@ -148,6 +148,108 @@ const server = http.createServer((req, res) => {
       T('leaveHide', () => { leaveHide(); return !!P.hidden; });
     }
 
+    // 10b. the Lodger's mind: drive a long simulation and record which
+    //      states he actually reaches, and that his memory decays
+    {
+      resume();
+      const seen = {};
+      const poses = {};
+      const realPose = poseLodger;
+      poseLodger = function (b, t, st, sp, ln, hy, hp) { poses[st] = (poses[st] | 0) + 1; return realPose(b, t, st, sp, ln, hy, hp); };
+      // quiet player, far away: he should patrol, listen and search
+      P.x = 2.5; P.z = 2.5; V.x = 26.5; V.z = 26.5; P.hidden = null;
+      THROWN.length = 0; LURES.length = 0; WARDS.length = 0; BLOODTRAIL.length = 0;
+      resetMind(); NOISE.level = 0; NOISE.mic = 0; NOISE.move = 0; NOISE.step = 0;
+      for (let i = 0; i < 3000; i++) {
+        P.alive = true;
+        try { updateNoise(0.05); updateVillain(0.05); } catch (e) { errs.push('AI tick: ' + e.message + ' @ ' + String(e.stack).split('\n')[1]); break; }
+        seen[V.state] = (seen[V.state] | 0) + 1;
+        if (Math.hypot(V.x - P.x, V.z - P.z) < 1.2) { V.x = 26.5; V.z = 26.5; resetMind(); }
+      }
+      log.push('quiet 150s states: ' + JSON.stringify(seen));
+      // now make a racket and check he commits, and that he actually arrives
+      const seen2 = {};
+      resetMind();
+      // put both of them on real floor, far apart
+      const floors = [];
+      for (let gy = 1; gy < MH - 1; gy++) for (let gx = 1; gx < MW - 1; gx++)
+        if (!solid(gx, gy) && !doorAt(gx, gy)) floors.push({ x: gx, y: gy });
+      P.x = floors[0].x + 0.5; P.z = floors[0].y + 0.5;
+      let far = floors[0];
+      for (const f of floors) {
+        const d = Math.hypot(f.x + 0.5 - P.x, f.y + 0.5 - P.z);
+        if (d > 13 && d < 18) { far = f; break; }
+      }
+      V.x = far.x + 0.5; V.z = far.y + 0.5;
+      const d0 = Math.hypot(V.x - P.x, V.z - P.z);
+      let nullSteps = 0, moved = 0, stuckAt = null;
+      let px = V.x, pz = V.z, stillFor = 0;
+      for (let i = 0; i < 1200; i++) {
+        NOISE.level = 0.9; NOISE.stepAt = { x: Math.floor(P.x), y: Math.floor(P.z) }; P.alive = true;
+        try { updateVillain(0.05); } catch (e) { errs.push('AI loud tick: ' + e.message); break; }
+        seen2[V.state] = (seen2[V.state] | 0) + 1;
+        const st = pathStep(Math.floor(V.x), Math.floor(V.z), Math.floor(P.x), Math.floor(P.z));
+        if (!st) nullSteps++;
+        const d = Math.hypot(V.x - px, V.z - pz);
+        moved += d;
+        if (d < 0.002) { stillFor++; if (stillFor > 40 && !stuckAt) stuckAt = Math.floor(V.x) + ',' + Math.floor(V.z) + ' state=' + V.state; }
+        else stillFor = 0;
+        px = V.x; pz = V.z;
+        if (Math.hypot(V.x - P.x, V.z - P.z) < 1.0) break;
+      }
+      log.push('loud states: ' + JSON.stringify(seen2) + ' conf=' + V.mind.conf.toFixed(2));
+      log.push('  start dist=' + d0.toFixed(1) + ' end dist=' + Math.hypot(V.x - P.x, V.z - P.z).toFixed(1) +
+               ' travelled=' + moved.toFixed(1) + 'm  pathStep null on ' + nullSteps + ' frames' +
+               (stuckAt ? '  STUCK at ' + stuckAt : ''));
+      // a quiet, steady footfall a few rooms away should put him into a
+      // stalk - walking it down - rather than a flat run
+      const seen3 = {};
+      resetMind();
+      for (const f of floors) {
+        const d = Math.hypot(f.x + 0.5 - P.x, f.y + 0.5 - P.z);
+        if (d > 4 && d < 7) { V.x = f.x + 0.5; V.z = f.y + 0.5; break; }
+      }
+      for (let i = 0; i < 700; i++) {
+        NOISE.level = 0.055; NOISE.stepAt = { x: Math.floor(P.x), y: Math.floor(P.z) }; P.alive = true;
+        try { updateVillain(0.05); } catch (e) { errs.push('AI stalk tick: ' + e.message); break; }
+        seen3[V.state] = (seen3[V.state] | 0) + 1;
+      }
+      log.push('quiet-footfall states: ' + JSON.stringify(seen3));
+      Object.keys(seen3).forEach(k => { seen2[k] = (seen2[k] | 0) + seen3[k]; });
+
+      // a fading idea of where you went should send him to look, not to run
+      {
+        const seen4 = {};
+        resume();                 // the last phase ended with him on top of you
+        resetMind();
+        for (const f of floors) {
+          const d = Math.hypot(f.x + 0.5 - P.x, f.y + 0.5 - P.z);
+          if (d > 9 && d < 13) { V.x = f.x + 0.5; V.z = f.y + 0.5; break; }
+        }
+        V.mind.conf = 0.22;
+        V.mind.lastKnown = { x: Math.floor(P.x), y: Math.floor(P.z) };
+        NOISE.level = 0;
+        for (let i = 0; i < 200; i++) {
+          P.alive = true; V.active = true;
+          try { updateVillain(0.05); } catch (e) { errs.push('AI investigate tick: ' + e.message); break; }
+          seen4[V.state] = (seen4[V.state] | 0) + 1;
+        }
+        log.push('fading-belief states: ' + JSON.stringify(seen4));
+        Object.keys(seen4).forEach(k => { seen2[k] = (seen2[k] | 0) + seen4[k]; });
+      }
+
+      // and that belief rots when the house goes quiet again
+      NOISE.level = 0;
+      for (let i = 0; i < 400; i++) { try { updateVillain(0.05); } catch (e) { break; } }
+      log.push('after 20s silence: conf=' + V.mind.conf.toFixed(2) + ' state=' + V.state +
+               ' frustration=' + V.mind.frustration.toFixed(2));
+      log.push('poses driven: ' + Object.keys(poses).join(','));
+      poseLodger = realPose;
+      const wanted = ['patrol', 'listen', 'search', 'investigate', 'stalk', 'hunt'];
+      const never = wanted.filter(w => !seen[w] && !seen2[w]);
+      if (never.length) errs.push('AI states never reached: ' + never.join(','));
+    }
+
     // 11. a long soak with the villain hunting
     V.state = 'hunt'; V.lastSeen = { x: Math.floor(P.x), y: Math.floor(P.z) };
     P.alive = true;
@@ -159,9 +261,10 @@ const server = http.createServer((req, res) => {
 
   console.log('--- LOG ---');
   report.log.forEach(l => console.log('  ' + l));
-  console.log('--- ERRORS (' + (report.errs.length + fatal.length) + ') ---');
+  const realFatal = fatal.filter(f => !/Pointer Lock/.test(f));
+  console.log('--- ERRORS (' + (report.errs.length + realFatal.length) + ') ---');
   report.errs.forEach(l => console.log('  ' + l));
-  fatal.filter(f => !/Pointer Lock/.test(f)).forEach(l => console.log('  ' + l));
+  realFatal.forEach(l => console.log('  ' + l));
   await browser.close(); server.close();
-  process.exit(report.errs.length ? 3 : 0);
+  process.exit((report.errs.length + realFatal.length) ? 3 : 0);
 })().catch(e => { console.error('HARNESS FAIL', e); process.exit(1); });
