@@ -260,7 +260,7 @@
     <p class="body">In the winter of 1974 your grandfather rented the attic room of Hollowmere House to a quiet man who paid a year in advance and never gave a name. In the spring the house burned. Everyone got out. The lodger did not.</p>
     <p class="body">Forty years later your brother Elias bought the ruin, wrote you eleven letters about restoring it, then wrote a twelfth: <em>"The wiring is fine. It's the house that keeps switching itself on."</em></p>
     <p class="body">Tonight you let yourself in. The power is dead, the fuse box is stripped, and something on the ground floor is walking with a limp it did not have an hour ago.</p>
-    <p class="body">What walks the ground floor is not the lodger any more. Something came up out of the cellar wearing what was left of him: a bald slab of a man, stripped to the waist, his jaw strapped into a studded leather muzzle with the teeth pushing out through it, and a long forged blade run out of each wrist. The fire took his eyes and left two coals in the sockets. He finds you the only way left to him &mdash; he listens.</p>
+    <p class="body">What walks the ground floor is not the lodger any more. Something came up out of the cellar wearing what was left of him: a bald slab of a man, stripped to the waist, a studded pauldron strapped over one shoulder and old linen wound up the other arm, and a long forged blade run out through each forearm. The lower half of his face is gone. What is there instead opens from one cheek to the other, and it is full of teeth that were never in a man. The fire took his eyes and left two coals in the sockets. He finds you the only way left to him &mdash; he listens.</p>
     <p class="body">He is patient about it. You will hear him breathing through the muzzle before you hear his boots, and you will hear the blades touch the floorboards before either. He opens the wardrobes. He looks under the beds. And when you finally get a door between the two of you, he takes about two seconds over it.</p>
     <h2 class="title" style="font-size:17px;margin-top:30px">How he hunts</h2>
     <p class="body" style="font-size:14.5px;line-height:1.9">
@@ -3021,10 +3021,11 @@ function buildLodger(){
 
   /* =====================================================================
      THE LODGER - built to the reference: a huge bare-chested brute, bald,
-     tan hide over slab muscle, the lower face buckled into a leather mask
-     with the teeth pushing out of it, linen wraps up both forearms, a
-     studded harness, slate-teal canvas trousers, oxblood boots with iron
-     plates - and a long forged blade run out of each wrist.
+     tan hide over slab muscle, the lower face split ear to ear into a maw
+     of interlocking fangs, linen wraps up both forearms, one studded
+     pauldron, a strap harness, slate-teal canvas trousers, oxblood boots
+     with iron plates - and a long forged blade run out through each
+     forearm, projecting past the fist with a short tang behind the wrist.
      ===================================================================== */
   const SK = 'orcSkin', MK = 'maskLeather', WR = 'wrapCloth', TR = 'tealTrouser',
         RB = 'redBoot', SA = 'sashRed', ST = 'ironStud', BL = 'warBlade',
@@ -3246,36 +3247,56 @@ function buildLodger(){
     ...[-1, 1].map(s => ({ tex: SK, prim: GEO.blob(0.014, 0.032, 0.026, 14, 10),
       mat: mat(s*0.104, 0.096, 0.004, 0, 0, s*0.20) })),
 
-    /* ---- the muzzle: leather over the jaw, buckled round the skull ---- */
+    /* ---- only a strap now, round the crown and back of the skull. The
+       reference has no leather anywhere near the mouth: the lower half of
+       that face is teeth from one cheek to the other, and putting a muzzle
+       over it was the single biggest thing making him someone else. ---- */
     { tex: MK, prim: GEO.loft([
-        { y:  0.056, cz: 0.014, rx: 0.106, rz: 0.104, k: 2.6 },
-        { y:  0.020, cz: 0.014, rx: 0.108, rz: 0.106, k: 2.7 },
-        { y: -0.026, cz: 0.014, rx: 0.100, rz: 0.102, k: 2.9 },
-        { y: -0.070, cz: 0.014, rx: 0.076, rz: 0.082, k: 3.0 },
-        { y: -0.098, cz: 0.012, rx: 0.042, rz: 0.050, k: 2.8 }
-      ], 32, 6, false, true), mat: I },
-    // the strap over the bridge of the nose and round the back of the head
-    { tex: MK, prim: GEO.loft([
-        { y: 0.058, rx: 0.112, rz: 0.110, k: 2.6 },
-        { y: 0.080, rx: 0.114, rz: 0.112, k: 2.6 },
-        { y: 0.100, rx: 0.108, rz: 0.106, k: 2.6 }
+        { y: 0.062, rx: 0.112, rz: 0.110, k: 2.6 },
+        { y: 0.084, rx: 0.114, rz: 0.112, k: 2.6 },
+        { y: 0.104, rx: 0.108, rz: 0.106, k: 2.6 }
       ], 26, 4, false, false), mat: I },
     ...[0.9, 2.2, 3.9, 5.2].map(a => Object.assign({}, stud(0.011, 0.008),
-      { mat: mat(Math.sin(a)*0.112, 0.080, Math.cos(a)*0.110) })),
+      { mat: mat(Math.sin(a)*0.112, 0.084, Math.cos(a)*0.110) })),
 
-    /* ---- the mouth: black gap, and the tusks coming out of it ---- */
-    { tex: DK, prim: GEO.blob(0.052, 0.026, 0.022, 20, 12), mat: mat(0, 0.006, 0.088) },
-    // upper row: long fangs raking down over the leather
-    ...Array.from({ length: 7 }, (_, i) => {
-      const x = -0.042 + i*0.014, big = (i === 1 || i === 5) ? 1.9 : (i === 3 ? 1.2 : 1);
+    /* ---- THE MAW -------------------------------------------------------
+       A lipless split running nearly ear to ear, the gum ridge standing
+       proud of it, and eleven long triangular teeth raking down out of it.
+       They get longest either side of centre and shorten toward the
+       corners, and every one of them is canted slightly outward, so the
+       row reads as a set of blades rather than a comb.                  */
+    /* The dark of the mouth. It has to stand PROUD of the face, not sit
+       inside it: the skull cross-section is nearly a rounded square, so
+       teeth set at the same depth as the nose are buried everywhere except
+       dead centre - which is why the first pass showed exactly two fangs
+       out of eleven. Everything in the maw lives forward of z = 0.09. */
+    { tex: DK, prim: GEO.blob(0.090, 0.044, 0.046, 24, 14), mat: mat(0, -0.004, 0.072) },
+    /* The gum ridge is dark, not skin. Flesh-coloured gums made the whole
+       lower face one pale band with the teeth lost in it; in the reference
+       the gums are almost black and the teeth are the only bright thing on
+       him. */
+    { tex: DK, prim: GEO.loft([
+        { y: 0.034, cz: 0.078, rx: 0.088, rz: 0.024, k: 3.2 },
+        { y: 0.020, cz: 0.084, rx: 0.092, rz: 0.028, k: 3.2 },
+        { y: 0.008, cz: 0.082, rx: 0.086, rz: 0.026, k: 3.0 }
+      ], 22, 4, true, true), mat: I },
+    // the corners of the mouth, split back past where a mouth should stop
+    ...[-1, 1].map(sgn => ({ tex: DK, prim: GEO.blob(0.022, 0.016, 0.026, 12, 9),
+      mat: mat(sgn*0.082, 0.004, 0.074) })),
+    // upper row: eleven, longest either side of the middle
+    ...Array.from({ length: 11 }, (_, i) => {
+      const t = (i - 5) / 5;                       // -1 .. 1 across the face
+      const x = t * 0.078;
+      const big = 1.45 - Math.abs(t) * 0.50 + (Math.abs(i - 3) < 0.5 || Math.abs(i - 7) < 0.5 ? 0.40 : 0);
+      const w = 0.0104 - Math.abs(t) * 0.0022;
       return { tex: TH, prim: GEO.loft([
-          { y:  0.000, rx: 0.0088, rz: 0.0074, k: 2.4 },
-          { y: -0.014*big, rx: 0.0072, rz: 0.0060, k: 2.4 },
-          { y: -0.026*big, rx: 0.0044, rz: 0.0038, k: 2.4 },
-          { y: -0.034*big, rx: 0.0008, rz: 0.0008, k: 2.4 }
+          { y:  0.000,        rx: w,        rz: w*0.82, k: 2.5 },
+          { y: -0.011*big,    rx: w*0.82,   rz: w*0.66, k: 2.5 },
+          { y: -0.020*big,    rx: w*0.48,   rz: w*0.40, k: 2.4 },
+          { y: -0.027*big,    rx: w*0.06,   rz: w*0.06, k: 2.4 }
         ], 10, 4, true, true),
-        mat: mat(x, 0.020, 0.094 - Math.abs(i-3)*0.004, 0.16, 0, x*1.6) };
-    }),
+        mat: mat(x, 0.012, 0.100 + Math.abs(t)*0.002, 0.22, 0, t*0.44) };
+    })
   ]);
 
   /* ================= the jaw ===========================================
@@ -3291,24 +3312,28 @@ function buildLodger(){
     { tex: SK, prim: GEO.blob(0.062, 0.030, 0.052, 16, 11), mat: mat(0, -0.028, 0.040) },
     // the throat behind it: black, and the reason an open mouth reads at all
     { tex: DK, prim: GEO.blob(0.044, 0.030, 0.030, 14, 10), mat: mat(0, -0.012, 0.036) },
-    // the lower band of the muzzle, riveted, that travels with the jaw
-    { tex: MK, prim: GEO.loft([
-        { y: -0.034, rx: 0.066, rz: 0.058, k: 3.0 },
-        { y: -0.014, rx: 0.070, rz: 0.064, k: 3.2 },
-        { y:  0.004, rx: 0.066, rz: 0.062, k: 3.0 }
-      ], 18, 4, true, true), mat: mat(0, -0.006, 0.034) },
-    ...Array.from({ length: 5 }, (_, i) => Object.assign({}, stud(0.0072, 0.0055),
-      { mat: mat(-0.040 + i*0.020, -0.030, 0.082) })),
-    // lower row: tusks pushing up past the mask
-    ...Array.from({ length: 6 }, (_, i) => {
-      const x = -0.036 + i*0.0144, big = (i === 0 || i === 5) ? 2.1 : 1;
+    // the lower gum ridge, as dark as the upper one and just as proud
+    { tex: DK, prim: GEO.loft([
+        { y: -0.030, cz: 0.072, rx: 0.080, rz: 0.024, k: 3.2 },
+        { y: -0.018, cz: 0.078, rx: 0.084, rz: 0.028, k: 3.2 },
+        { y: -0.006, cz: 0.076, rx: 0.078, rz: 0.026, k: 3.0 }
+      ], 22, 4, true, true), mat: mat(0, 0, 0) },
+    /* lower row: ten, interlocking with the upper set. They are set a half
+       tooth off centre so the two rows mesh rather than meeting point to
+       point, which is what makes a closed mouth still read as full of
+       teeth from across a room. */
+    ...Array.from({ length: 10 }, (_, i) => {
+      const t = (i - 4.5) / 4.5;
+      const x = t * 0.070;
+      const big = 1.30 - Math.abs(t) * 0.44 + (Math.abs(i - 2) < 0.5 || Math.abs(i - 7) < 0.5 ? 0.44 : 0);
+      const w = 0.0100 - Math.abs(t) * 0.0020;
       return { tex: TH, prim: GEO.loft([
-          { y: 0.000, rx: 0.0090, rz: 0.0076, k: 2.4 },
-          { y: 0.015*big, rx: 0.0072, rz: 0.0060, k: 2.4 },
-          { y: 0.027*big, rx: 0.0044, rz: 0.0038, k: 2.4 },
-          { y: 0.036*big, rx: 0.0008, rz: 0.0008, k: 2.4 }
+          { y: 0.000,      rx: w,       rz: w*0.82, k: 2.5 },
+          { y: 0.010*big,  rx: w*0.82,  rz: w*0.66, k: 2.5 },
+          { y: 0.019*big,  rx: w*0.48,  rz: w*0.40, k: 2.4 },
+          { y: 0.026*big,  rx: w*0.06,  rz: w*0.06, k: 2.4 }
         ], 10, 4, true, true),
-        mat: mat(x, -0.014, 0.074 - Math.abs(i-2.5)*0.004, -0.16, 0, x*1.8) };
+        mat: mat(x, -0.016, 0.094 + Math.abs(t)*0.002, -0.22, 0, t*0.48) };
     })
   ]);
 
@@ -3409,13 +3434,21 @@ function buildLodger(){
           { y: -0.036, rx: 0.054, rz: 0.050, k: 2.4 }
         ], 20, 4, false, false), mat: I }
     ];
-    /* THE BLADES: one long, one short, running out past the fist */
-    hand.push(Object.assign({}, armBlade(0.86, 0.040, 0.011),
-      { mat: mat(sx*0.016, -0.086, 0.030, 3.1416 - 0.10, 0, sx*0.05) }));
-    hand.push(Object.assign({}, armBlade(0.52, 0.030, 0.009),
-      { mat: mat(sx*-0.020, -0.080, 0.006, 3.1416 - 0.02, 0, sx*-0.10) }));
-    // the bolted collar where they leave the brace
-    hand.push({ tex: ST, prim: GEO.blob(0.038, 0.024, 0.034, 16, 12), mat: mat(0, -0.076, 0.016) });
+    /* THE BLADES. They are mounted THROUGH the forearm, not held: the long
+       run projects out past the fist and a short tang carries on behind the
+       wrist, which is what stops them reading as a pair of knives he is
+       gripping. Longer and thinner than they were, to the reference - the
+       working length is about twice his forearm, and the taper runs the
+       whole way rather than stopping at a shoulder. */
+    hand.push(Object.assign({}, armBlade(0.98, 0.034, 0.0095),
+      { mat: mat(sx*0.022, -0.086, 0.030, 3.1416 - 0.09, 0, sx*0.06) }));
+    hand.push(Object.assign({}, armBlade(0.60, 0.026, 0.0080),
+      { mat: mat(sx*-0.016, -0.080, 0.004, 3.1416 - 0.02, 0, sx*-0.11) }));
+    // the tang carrying on behind the wrist, so it is run through the arm
+    hand.push(Object.assign({}, armBlade(0.20, 0.026, 0.0085),
+      { mat: mat(sx*0.022, -0.058, 0.026, -0.14, 0, sx*0.10) }));
+    // the bolted collar at the wrist where they leave the brace
+    hand.push({ tex: ST, prim: GEO.blob(0.040, 0.028, 0.036, 16, 12), mat: mat(sx*0.014, -0.026, 0.008) });
     add('hand' + S_, 'foreArm' + S_, 0, -0.284, 0, hand);
 
     /* ================= legs ================= */
@@ -4442,31 +4475,33 @@ const TEXGEN = {
     const c = texCanvas(S), x = c.getContext('2d');
     const px1 = Math.max(1, S/512);
 
-    /* Base: cold grey-green, and DARK. He is lit by one torch in a black
-       house, so if his hide sits anywhere near the value of the plaster
-       behind him he stops being a shape in the dark and becomes the
-       brightest thing in the room. He should be read off his edges. */
+    /* Base: warm tan with an olive undertone, off the reference. A shade
+       darker than the reference sits, because that is a studio-lit statue
+       and this is one torch in a black house - at the reference's own value
+       he clips to white the moment the beam finds him. Warm, though, not
+       the grey I had him at: the reference is a living hide, sunburnt over
+       the shoulders and dirty in the creases, not a corpse. */
     const g = x.createLinearGradient(0, 0, 0, S);
-    g.addColorStop(0.00, '#3d4033');
-    g.addColorStop(0.42, '#34372c');
-    g.addColorStop(1.00, '#2b2d24');
+    g.addColorStop(0.00, '#8d6a45');
+    g.addColorStop(0.42, '#7a5b3b');
+    g.addColorStop(1.00, '#634a31');
     x.fillStyle = g; x.fillRect(0, 0, S, S);
 
     // ---- broad tonal drift, so no two square inches read the same
-    blotches(x, S, 34, 'rgba(56,58,44,0.34)', S*0.05, S*0.26);   // deeper green shadow
-    blotches(x, S, 22, 'rgba(112,110,80,0.20)', S*0.03, S*0.18);  // where it has dried pale
-    blotches(x, S, 16, 'rgba(104,88,38,0.20)', S*0.04, S*0.22);   // jaundice
-    blotches(x, S, 13, 'rgba(58,38,64,0.24)', S*0.04, S*0.20);    // settled bruise
-    blotches(x, S, 10, 'rgba(96,34,28,0.16)', S*0.02, S*0.13);    // raw and angry
+    blotches(x, S, 34, 'rgba(78,54,32,0.34)', S*0.05, S*0.26);    // grime in the hollows
+    blotches(x, S, 22, 'rgba(168,132,92,0.22)', S*0.03, S*0.18);   // where the sun got him
+    blotches(x, S, 16, 'rgba(126,96,44,0.20)', S*0.04, S*0.22);    // old sallow patches
+    blotches(x, S, 13, 'rgba(86,48,44,0.22)', S*0.04, S*0.20);     // settled bruise
+    blotches(x, S, 10, 'rgba(126,48,34,0.18)', S*0.02, S*0.13);    // raw and angry
 
     // ---- burn scarring: wide hairless plates of keloid, shiny and taut,
     //      with a blackened crackle at the edge where the fire stopped
     for (let i = 0; i < 7; i++){
       const cx = Math.random()*S, cy = Math.random()*S, r = S*(0.07 + Math.random()*0.15);
       const rg = x.createRadialGradient(cx, cy, r*0.15, cx, cy, r);
-      rg.addColorStop(0.00, 'rgba(150,120,104,0.40)');
-      rg.addColorStop(0.55, 'rgba(116,88,74,0.30)');
-      rg.addColorStop(0.86, 'rgba(40,26,20,0.34)');
+      rg.addColorStop(0.00, 'rgba(196,160,120,0.36)');
+      rg.addColorStop(0.55, 'rgba(148,110,76,0.28)');
+      rg.addColorStop(0.86, 'rgba(58,38,24,0.32)');
       rg.addColorStop(1.00, 'rgba(0,0,0,0)');
       x.fillStyle = rg; x.beginPath(); x.arc(cx, cy, r, 0, 7); x.fill();
       // the crackle: short broken fissures radiating out of the burn
@@ -4487,7 +4522,7 @@ const TEXGEN = {
     for (let i = 0; i < 26; i++){
       let vx = Math.random()*S, vy = Math.random()*S;
       let a = Math.random()*6.283;
-      x.strokeStyle = 'rgba(34,44,42,' + (0.10 + Math.random()*0.13).toFixed(3) + ')';
+      x.strokeStyle = 'rgba(62,52,42,' + (0.10 + Math.random()*0.13).toFixed(3) + ')';
       x.lineWidth = px1 * (1.1 + Math.random()*1.6);
       x.beginPath(); x.moveTo(vx, vy);
       for (let s = 0; s < 7; s++){
@@ -4498,7 +4533,7 @@ const TEXGEN = {
       x.stroke();
       // a finer branch off the last third
       x.lineWidth = px1 * 0.8;
-      x.strokeStyle = 'rgba(34,44,42,0.09)';
+      x.strokeStyle = 'rgba(62,52,42,0.09)';
       x.beginPath(); x.moveTo(vx, vy);
       for (let s = 0; s < 3; s++){
         a += (Math.random()-0.5)*1.4;
@@ -4530,7 +4565,7 @@ const TEXGEN = {
       const nx = -Math.sin(a)*px1*1.4, ny = Math.cos(a)*px1*1.4;
       x.strokeStyle = 'rgba(30,20,16,0.32)'; x.lineWidth = px1*2.0;
       x.beginPath(); x.moveTo(sx - nx, sy - ny); x.lineTo(ex - nx, ey - ny); x.stroke();
-      x.strokeStyle = 'rgba(158,138,118,0.30)'; x.lineWidth = px1*1.5;
+      x.strokeStyle = 'rgba(206,178,146,0.30)'; x.lineWidth = px1*1.5;
       x.beginPath(); x.moveTo(sx, sy); x.lineTo(ex, ey); x.stroke();
       // stitch marks across a few of them - somebody closed these once
       if (i % 4 === 0){
@@ -4549,12 +4584,12 @@ const TEXGEN = {
     // ---- pores and follicle stipple: what stops flesh reading as rubber
     for (let i = 0; i < S*S*0.010; i++){
       const ppx = Math.random()*S, ppy = Math.random()*S;
-      x.fillStyle = 'rgba(34,36,26,' + (0.05 + Math.random()*0.13).toFixed(3) + ')';
+      x.fillStyle = 'rgba(58,42,28,' + (0.05 + Math.random()*0.13).toFixed(3) + ')';
       x.fillRect(ppx, ppy, px1, px1);
     }
     for (let i = 0; i < S*S*0.003; i++){
       const ppx = Math.random()*S, ppy = Math.random()*S;
-      x.fillStyle = 'rgba(146,142,116,' + (0.04 + Math.random()*0.09).toFixed(3) + ')';
+      x.fillStyle = 'rgba(196,168,132,' + (0.04 + Math.random()*0.09).toFixed(3) + ')';
       x.fillRect(ppx, ppy, px1, px1);
     }
 
@@ -5517,13 +5552,17 @@ float shadowFactor(vec3 N, vec3 Ld){
      surface normal first, and further the more obliquely the light hits,
      so a curved 30 mm blob cannot shadow its own front face. */
   float slope = clamp(1.0 - abs(dot(N, Ld)), 0.0, 1.0);
-  float texelWorld = uShadowTexel * max(length(uCamPos - vPos), 0.6) * 2.6;
-  vec3 off = N * texelWorld * (1.2 + 5.0 * slope);
+  /* The offset has to hold up at arm's length as well as across a room. His
+     abdominal slabs are 26 mm across, and a shadow texel is a fraction of a
+     millimetre when he is a metre away, so a purely texel-scaled offset went
+     to nothing exactly when his face was closest to yours. Floor it. */
+  float texelWorld = max(uShadowTexel * max(length(uCamPos - vPos), 0.6) * 3.2, 0.0055);
+  vec3 off = N * texelWorld * (1.6 + 6.0 * slope);
   vec4 lp = uLightVP * vec4(vPos + off, 1.0);
   vec3 p = lp.xyz / lp.w;
   p = p * 0.5 + 0.5;
   if (p.z > 1.0 || p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0) return 1.0;
-  float bias = 0.0016 + 0.0060 * slope * slope;
+  float bias = 0.0022 + 0.0085 * slope * slope;
   float ang = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) * 6.2831853;
   float ca = cos(ang), sa = sin(ang);
   mat2 rot = mat2(ca, -sa, sa, ca);
@@ -6799,8 +6838,10 @@ buildLodger = function(){
   const stud = (r, d) => ({ tex: ST, prim: GEO.blob(r, r, d || r * 0.62, 12, 9) });
   const put = (k, parts) => { const b = bones[k]; if (b) for (const p of parts) b.meshes.push(p); };
 
-  /* 1. stud rows across the shoulder caps */
-  for (const k of keys('shoulder')){
+  /* 1. stud rows across the shoulder cap - the LEFT one only. He wears one
+     pauldron in the reference and the other shoulder is bare under linen;
+     studding both made him symmetrical, which he is not. */
+  for (const k of keys('shoulder').filter(k => k.charAt(k.length - 1) === 'L')){
     const c = centre(bones[k]), out = [];
     for (let row = 0; row < 2; row++){
       for (let i = 0; i < 4; i++){
@@ -10098,7 +10139,7 @@ function renderFrame(dt){
        the normal offset on the receiver, nothing in the house shadows itself
        - and the Lodger stops being a lit body with holes cut in it. */
     gl.enable(gl.POLYGON_OFFSET_FILL);
-    gl.polygonOffset(2.2, 4.0);
+    gl.polygonOffset(3.4, 8.0);
     gl.useProgram(PROG.depth.p);
     gl.uniformMatrix4fv(PROG.depth.u.uVP, false, mLightVP);
     drawScene(PROG.depth, true);
