@@ -67,26 +67,25 @@ export function build() {
   };
 
   // ------------------------------------------------------------- bookshelf --
-  // Four galleries along the north wall. Books stand at the back, the front
-  // 1.7 m of every level is a walkway, and a staircase on each level climbs
-  // through a deliberate gap in the walkway above it.
-  const BOOK_Z = -19.3, WALK_Z = -16.85, SHELF_W = 26.4, SHELF_CX = -11;
+  // Four galleries along the north wall. Each level is three lanes: books at
+  // the back, a stair lane, and a front lip. Only the stair lane is cut away
+  // where a staircase climbs through, so every gallery stays walkable end to
+  // end whichever way you came up.
+  const BOOK_Z = -19.4, STAIR_Z = -17.9, LIP_Z = -16.55;
+  const SHELF_W = 26.4, SHELF_CX = -11;
   const LEVELS = [0, 3.3, 6.6, 9.9];
   const BAYS = [[-23.75, -19.05], [-18.55, -13.85], [-13.35, -8.65], [-8.15, -3.45], [-2.95, 1.75]];
-  m.box(SHELF_CX, 0, -20.2, SHELF_W, 11.5, 0.6, PLANK2, { tag: 'shelfBack' });
+  m.box(SHELF_CX, 0, -20.5, SHELF_W, 11.5, 0.6, PLANK2, { tag: 'shelfBack' });
   for (const ux of [-24, -18.8, -13.6, -8.4, -3.2, 2]) {
-    m.box(ux, 0, -19.0, 0.5, 11.5, 2.6, PLANK2, { tag: 'shelfUpright' });
+    m.box(ux, 0, BOOK_Z, 0.5, 11.5, 1.6, PLANK2, { tag: 'shelfUpright' });
   }
-  // Walkway gaps that the internal staircases climb through.
-  const WALK_GAP = { 2: [-8.9, -3.5], 3: [-16.3, -11.3] };
+  const STAIR_GAP = { 2: [-8.9, -4.4], 3: [-15.85, -11.35] };
   LEVELS.forEach((ly, li) => {
-    m.box(SHELF_CX, ly, -19.05, SHELF_W, 0.35, 2.7, PLANK, { tag: 'shelf' });
-    const gap = WALK_GAP[li];
-    const segs = gap
-      ? [[-24.2, gap[0]], [gap[1], 2.2]]
-      : [[-24.2, 2.2]];
-    for (const [a, b] of segs) {
-      m.box((a + b) / 2, ly, WALK_Z, b - a, 0.35, 1.7, PLANK, { tag: 'shelfWalk' });
+    m.box(SHELF_CX, ly, BOOK_Z, SHELF_W, 0.35, 1.6, PLANK, { tag: 'shelf' });
+    m.box(SHELF_CX, ly, LIP_Z, SHELF_W, 0.35, 1.3, PLANK, { tag: 'shelfLip' });
+    const gap = STAIR_GAP[li];
+    for (const [a, b] of (gap ? [[-24.2, gap[0]], [gap[1], 2.2]] : [[-24.2, 2.2]])) {
+      m.box((a + b) / 2, ly, STAIR_Z, b - a, 0.35, 1.4, PLANK, { tag: 'shelfWalk' });
     }
   });
   // Books, filled bay by bay. One bay per level is left clear to stand in.
@@ -98,21 +97,21 @@ export function build() {
       while (bx < bay[1] - 0.9) {
         const w = m.range(0.55, 1.15);
         if (m.chance(0.12)) { bx += w + 0.6; continue; }
-        m.box(bx + w / 2, ly + 0.35, BOOK_Z + m.range(-0.2, 0.2), w, m.range(1.5, 2.1), 2.2,
+        m.box(bx + w / 2, ly + 0.35, BOOK_Z + m.range(-0.15, 0.15), w, m.range(1.5, 2.1), 1.5,
           m.pick(BOOKC), { yaw: m.range(-4, 4), jitter: 0.09, tag: 'book' });
         bx += w + 0.12;
       }
     });
   });
-  bookStair(-0.6, -10.3, 180, 9, 0.41, 0.7, 3.0);                    // floor  -> level 1
-  bookStair(-8.8, WALK_Z, 90, 8, 0.41, 0.55, 1.5, 3.3);              // level 1 -> level 2
-  bookStair(-11.4, WALK_Z, 270, 8, 0.41, 0.55, 1.5, 6.6);            // level 2 -> level 3
+  bookStair(-0.6, -15.9 + 9 * 0.7, 180, 9, 0.41, 0.7, 3.0);          // floor   -> level 1
+  bookStair(-8.85, STAIR_Z, 90, 8, 0.41, 0.55, 1.3, 3.65);           // level 1 -> level 2
+  bookStair(-11.4, STAIR_Z, 270, 8, 0.41, 0.55, 1.3, 6.95);          // level 2 -> level 3
   m.spot(-11.0, 0.35, BOOK_Z, { stance: 'crouch', quality: 0.72, hint: 'In the empty bay on the bottom shelf' });
-  m.spot(-0.6, 3.65, WALK_Z, { stance: 'crouch', quality: 0.58, hint: 'Where the book stairs land, second shelf' });
+  m.spot(-0.6, 3.65, LIP_Z, { stance: 'crouch', quality: 0.58, hint: 'Where the book stairs land, second shelf' });
   m.spot(-0.6, 3.65, BOOK_Z, { stance: 'stand', quality: 0.8, hint: 'Standing among the books, second shelf' });
   m.spot(-21.4, 6.95, BOOK_Z, { stance: 'crouch', quality: 0.86, hint: 'Third shelf, far end' });
   m.spot(-5.8, 10.25, BOOK_Z, { stance: 'prone', quality: 0.9, hint: 'Flat on the very top shelf' });
-  m.spot(-20, 10.25, WALK_Z, { stance: 'prone', quality: 0.82, hint: 'Along the top gallery' });
+  m.spot(-20, 10.25, LIP_Z, { stance: 'prone', quality: 0.82, hint: 'Along the top gallery' });
 
   // ------------------------------------------------------------ doll house --
   const DX = 16, DZ = -15.5;
@@ -318,6 +317,10 @@ export function build() {
   m.light(-23.5, 7.0, 4, '#dceeff', 1.2, 24);
   m.light(-19, 3.0, 11, '#ffe0ea', 0.5, 12);
   m.light(6, 2.5, 4, '#e8f6ff', 0.55, 16);
+  m.light(-11, 4.6, -17.5, '#ffeccd', 0.5, 14);
+  m.light(-11, 11.2, -17.5, '#ffeccd', 0.45, 14);
+  m.light(20, 6.4, 9, '#ffe4ee', 0.45, 14);
+  m.light(-9, 3.4, 17.4, '#fff2d8', 0.4, 12);
 
   // ---------------------------------------------------------------- spawns --
   m.spawnHider(-23, -14); m.spawnHider(-8, -14); m.spawnHider(5, -18);

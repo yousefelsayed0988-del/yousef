@@ -554,6 +554,9 @@ export function createMatch(opts = {}) {
     clock = now;
     tickCount++;
     const m = mode();
+    // Turn over the guard's per-pair visibility cache; without this every
+    // seeker/hider pair would keep answering with the first result it ever got.
+    guard.beginTick();
 
     for (const p of players.values()) {
       if (p.emote && p.emote.until <= clock) p.emote = null;

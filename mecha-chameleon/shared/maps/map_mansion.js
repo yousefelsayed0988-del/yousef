@@ -40,11 +40,15 @@ export function build() {
   m.ceil(0, 0, 56, 44, '#3a2e28', 5.4);
 
   // ------------------------------------------------------------ great hall --
+  // The wing doorways have to line up with the openings the wings themselves
+  // declare, or the rooms end up sealed behind two coincident walls.
   m.room({
     x: 0, z: 0, w: 24, d: 24, h: 5.4, floor: FLOOR, wall: WALL,
     openings: [
-      { side: 'w', at: 0, width: 4, height: 3.4 },
-      { side: 'e', at: 0, width: 4, height: 3.4 },
+      { side: 'w', at: -8, width: 4, height: 3.4 },   // library
+      { side: 'e', at: -8, width: 4, height: 3.4 },   // kitchen
+      { side: 'w', at: 10, width: 4, height: 3.4 },   // dining room
+      { side: 'e', at: 10, width: 4, height: 3.4 },   // ballroom
       { side: 'n', at: -6, width: 3.2, height: 3.4 },
       { side: 'n', at: 6, width: 3.2, height: 3.4 },
       { side: 's', at: 0, width: 5, height: 3.6 },
@@ -96,7 +100,7 @@ export function build() {
   // ------------------------------------------------------------ west wing --
   m.room({
     x: -19, z: -8, w: 14, d: 16, h: 4.6, floor: '#5a4a3a', wall: WALL_DARK,
-    openings: [{ side: 'e', at: 4, width: 3.4, height: 3.2 }],
+    openings: [{ side: 'e', at: 0, width: 4, height: 3.4 }],
   });
   // Library: bookcases make superb vertical clutter.
   for (let i = 0; i < 5; i++) {
@@ -124,7 +128,7 @@ export function build() {
   // Dining room, west-south.
   m.room({
     x: -19, z: 10, w: 14, d: 14, h: 4.6, floor: FLOOR, wall: WALL,
-    openings: [{ side: 'e', at: -2, width: 3.4, height: 3.2 }],
+    openings: [{ side: 'e', at: 0, width: 4, height: 3.2 }],
   });
   m.table(-19, 10, 5.2, 1.6, 0.78, '#3f2c1e');
   for (let i = -2; i <= 2; i++) {
@@ -139,7 +143,7 @@ export function build() {
   // ------------------------------------------------------------ east wing --
   m.room({
     x: 19, z: -8, w: 14, d: 16, h: 4.6, floor: '#5f5348', wall: '#6d5b4c',
-    openings: [{ side: 'w', at: 4, width: 3.4, height: 3.2 }],
+    openings: [{ side: 'w', at: 0, width: 4, height: 3.2 }],
   });
   // Kitchen: counters, crates and a walk-in pantry.
   m.box(19, 0, -15.2, 12, 0.92, 0.8, '#8e8577', { tag: 'counter' });
@@ -159,7 +163,7 @@ export function build() {
   // Ballroom, east-south: deliberately open, so only good paint saves you.
   m.room({
     x: 19, z: 10, w: 14, d: 14, h: 5.2, floor: '#7a6a52', wall: '#8a7a62',
-    openings: [{ side: 'w', at: -2, width: 3.4, height: 3.4 }],
+    openings: [{ side: 'w', at: 0, width: 4, height: 3.4 }],
   });
   for (let i = 0; i < 4; i++) {
     m.pillar(14.5 + i * 3, 15.5, 0.4, 5.2, CREAM);
@@ -172,7 +176,6 @@ export function build() {
   m.cyl(19, 4.2, 10, 0.8, 0.4, GOLD, { solid: false, emis: 0.6 });
 
   // ------------------------------------------------------ corridors + trim --
-  m.room({ x: -13, z: -8, w: 4, d: 3, h: 3.4, floor: FLOOR, wall: WALL, ceil: false, openings: [{ side: 'w', at: 0, width: 3.4 }, { side: 'e', at: 0, width: 3.4 }] });
   for (let i = 0; i < 14; i++) {
     const x = -26 + i * 4;
     m.poster(x, 2.6, -21.7, 1.4, 1.8, m.pick(['#3a2a4a', '#4a3a2a', '#2a3a4a']), { yaw: 0 });

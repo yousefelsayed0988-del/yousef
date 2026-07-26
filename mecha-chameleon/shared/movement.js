@@ -65,10 +65,14 @@ export function applyInput(world, p, input, dt) {
   const mag = Math.hypot(mx, mz);
   if (mag > 1) { mx /= mag; mz /= mag; }
 
+  // Forward (mz = -1) must line up with dirFromAngles(yaw): at yaw 0 that is
+  // -Z, and +mx must strafe right, i.e. +X. Getting either sign wrong walks
+  // the player backwards, so the basis is derived rather than guessed:
+  //   forward = (-sin yaw, 0, -cos yaw)     right = (cos yaw, 0, -sin yaw)
+  //   wish    = right * mx + forward * (-mz)
   const sin = Math.sin(p.yaw), cos = Math.cos(p.yaw);
-  // Forward is -Z in the player's frame; yaw rotates it about +Y.
-  const wishX = -mx * cos - mz * sin;
-  const wishZ = mx * sin - mz * cos;
+  const wishX = mx * cos + mz * sin;
+  const wishZ = -mx * sin + mz * cos;
 
   // Sprinting: only upright, only moving forward-ish, only with stamina.
   const wantSprint = !!(buttons & BTN.SPRINT) && stance === Stance.STAND && mag > 0.1;

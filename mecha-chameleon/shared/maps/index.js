@@ -2,29 +2,18 @@
 // build() is called lazily and the result cached, so importing this module is
 // cheap even though the pack is large.
 
-import * as mansion from './map_mansion.js';
-import * as sewer from './map_sewer.js';
 import * as backrooms from './map_backrooms.js';
 import * as country from './map_country.js';
-import * as penguin from './map_penguin.js';
-import * as sugarland from './map_sugarland.js';
+import * as mansion from './map_mansion.js';
 import * as osaka from './map_osaka.js';
+import * as penguin from './map_penguin.js';
+import * as sewer from './map_sewer.js';
+import * as sugarland from './map_sugarland.js';
 import * as toyroom from './map_toyroom.js';
-import * as supermarket from './map_supermarket.js';
-import * as gallery from './map_gallery.js';
-import * as subway from './map_subway.js';
-import * as pool from './map_pool.js';
-import * as coldstorage from './map_coldstorage.js';
 import * as viking from './map_viking.js';
-import * as egypt from './map_egypt.js';
-import * as museum from './map_museum.js';
-import * as arcade from './map_arcade.js';
-import * as greenhouse from './map_greenhouse.js';
 
 const MODULES = [
-  mansion, sewer, backrooms, country, penguin, sugarland, osaka, toyroom,
-  supermarket, gallery, subway, pool, coldstorage, viking, egypt, museum,
-  arcade, greenhouse,
+  backrooms, country, mansion, osaka, penguin, sewer, sugarland, toyroom, viking,
 ];
 
 export const MAP_LIST = MODULES.map((mod) => ({
