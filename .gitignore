@@ -4,3 +4,7 @@ build/
 dist/
 *.spec
 shots/
+
+# scratch harnesses written by review agents
+_probe*.js
+_run_*.js
