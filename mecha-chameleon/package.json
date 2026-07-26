@@ -1,0 +1,17 @@
+{
+  "name": "mecha-chameleon",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mecha Chameleon - online hide-and-seek where hiders paint themselves into the scenery and hunters flush them out with paint guns.",
+  "type": "module",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node server/index.js --verbose",
+    "validate": "node tools/validate-maps.js",
+    "test": "node tools/validate-maps.js && node tools/test-sim.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

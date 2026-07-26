@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+<meta name="theme-color" content="#0d1117" />
+<title>Mecha Chameleon</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🦎</text></svg>" />
+<link rel="stylesheet" href="/client/css/style.css" />
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<!-- ------------------------------------------------------------- in game -->
+<div id="hud" class="hud hidden">
+  <div class="hud-top">
+    <div id="phaseBox" class="phase-box">
+      <div id="phaseName" class="phase-name">Waiting</div>
+      <div id="phaseTimer" class="phase-timer">0:00</div>
+    </div>
+    <div id="teamCounts" class="team-counts">
+      <span class="pill hider"><b id="hiderCount">0</b> hiding</span>
+      <span class="pill hunter"><b id="hunterCount">0</b> hunting</span>
+    </div>
+    <div id="roundInfo" class="round-info"></div>
+  </div>
+
+  <div id="crosshair" class="crosshair"><i></i><i></i><i></i><i></i><span></span></div>
+  <div id="hitmarker" class="hitmarker"></div>
+  <div id="damageFlash" class="damage-flash"></div>
+
+  <div id="banner" class="banner"></div>
+  <div id="objective" class="objective"></div>
+
+  <div class="hud-bottom">
+    <div id="blendPanel" class="blend-panel">
+      <div class="blend-label">Camouflage</div>
+      <div class="blend-bar"><div id="blendFill"></div></div>
+      <div id="blendTier" class="blend-tier">–</div>
+      <div class="blend-hint" id="blendHint">Match the surfaces around you</div>
+    </div>
+    <div id="stancePanel" class="stance-panel">
+      <span id="stanceName">Standing</span>
+      <div class="stamina-bar"><div id="staminaFill"></div></div>
+    </div>
+    <div id="gunPanel" class="gun-panel hidden">
+      <div id="gunName" class="gun-name">Standard Paintgun</div>
+      <div class="ammo"><span id="ammoCount">24</span><small id="ammoMax">/24</small></div>
+      <div id="reloadBar" class="reload-bar hidden"><div id="reloadFill"></div></div>
+    </div>
+    <div id="abilityPanel" class="ability-panel"></div>
+  </div>
+
+  <div id="killfeed" class="killfeed"></div>
+  <div id="minimap" class="minimap"><canvas id="minimapCanvas" width="192" height="192"></canvas></div>
+  <div id="nameTags" class="name-tags"></div>
+
+  <div id="chatLog" class="chat-log"></div>
+  <form id="chatForm" class="chat-form hidden" autocomplete="off">
+    <input id="chatInput" maxlength="180" placeholder="Say something…" />
+  </form>
+
+  <div id="scoreboard" class="scoreboard hidden">
+    <div class="sb-head"><h3>Scoreboard</h3><span id="sbRoom"></span></div>
+    <table><thead><tr><th>Player</th><th>Role</th><th>Score</th><th>Tags</th><th>Survived</th><th>Blend</th></tr></thead>
+    <tbody id="sbBody"></tbody></table>
+  </div>
+
+  <!-- touch controls, shown only on touch devices -->
+  <div id="touchStick" class="touch-stick"><div id="touchKnob"></div></div>
+  <div id="touchLook" class="touch-look"></div>
+  <div id="touchButtons" class="touch-buttons">
+    <button data-touch="fire" class="tbtn fire">FIRE</button>
+    <button data-touch="jump" class="tbtn">JUMP</button>
+    <button data-touch="crouch" class="tbtn">CROUCH</button>
+    <button data-touch="paint" class="tbtn">PAINT</button>
+  </div>
+</div>
+
+<!-- --------------------------------------------------------------- paint -->
+<div id="paintScreen" class="paint-screen hidden">
+  <div class="paint-panel">
+    <header>
+      <h2>Paint your skin</h2>
+      <div class="paint-timer">Prep ends in <b id="paintTimer">0:00</b></div>
+      <button id="paintClose" class="ghost">Done <kbd>Q</kbd></button>
+    </header>
+
+    <div class="paint-body">
+      <div class="paint-left">
+        <div class="part-picker" id="partPicker"></div>
+        <div class="pattern-picker" id="patternPicker"></div>
+        <div class="paint-actions">
+          <button id="mimicBtn" class="primary">Auto-Mimic <kbd>T</kbd></button>
+          <button id="copyAllBtn" class="ghost">Apply to whole body</button>
+        </div>
+      </div>
+
+      <div class="paint-mid">
+        <canvas id="colorWheel" width="260" height="260"></canvas>
+        <div class="value-row">
+          <label>Brightness</label>
+          <input id="valueSlider" type="range" min="4" max="100" value="70" />
+        </div>
+        <div class="hex-row">
+          <span id="swatchPreview" class="swatch-preview"></span>
+          <input id="hexInput" maxlength="7" spellcheck="false" />
+        </div>
+      </div>
+
+      <div class="paint-right">
+        <h3>Map palette</h3>
+        <div class="palette" id="mapPalette"></div>
+        <h3>Nearby surfaces</h3>
+        <div class="palette" id="nearbyPalette"></div>
+        <div class="blend-readout">
+          <div class="blend-bar big"><div id="paintBlendFill"></div></div>
+          <div id="paintBlendText">Move somewhere with cover</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ---------------------------------------------------------- pose wheel -->
+<div id="poseWheel" class="pose-wheel hidden"></div>
+<div id="emoteWheel" class="pose-wheel hidden"></div>
+
+<!-- --------------------------------------------------------------- menus -->
+<div id="screens" class="screens">
+
+  <section id="screen-boot" class="screen on">
+    <div class="boot">
+      <div class="logo"><span class="logo-mark">🦎</span><h1>MECHA<em>CHAMELEON</em></h1></div>
+      <p class="tag">Paint yourself into the scenery. Or hunt whoever did.</p>
+      <div id="bootStatus" class="boot-status">Connecting…</div>
+    </div>
+  </section>
+
+  <section id="screen-menu" class="screen">
+    <div class="menu-wrap">
+      <div class="logo small"><span class="logo-mark">🦎</span><h1>MECHA<em>CHAMELEON</em></h1></div>
+      <div class="menu-grid">
+        <button class="card big" data-action="quick">
+          <h3>Quick Match</h3><p>Drop into the busiest open room right now.</p>
+        </button>
+        <button class="card" data-action="create">
+          <h3>Create Room</h3><p>Pick the map, the mode and who gets in.</p>
+        </button>
+        <button class="card" data-action="join">
+          <h3>Join by Code</h3><p>Got a 5-letter code or a link? In you go.</p>
+        </button>
+        <button class="card" data-action="browser">
+          <h3>Server Browser</h3><p>See every public room on this server.</p>
+        </button>
+        <button class="card" data-action="solo">
+          <h3>Solo vs Bots</h3><p>Practise hiding with nobody watching.</p>
+        </button>
+        <button class="card" data-action="profile">
+          <h3>Profile</h3><p>Level, unlocks, friends and stats.</p>
+        </button>
+        <button class="card" data-action="settings">
+          <h3>Settings</h3><p>Mouse, view, audio and key bindings.</p>
+        </button>
+        <button class="card" data-action="help">
+          <h3>How to Play</h3><p>Roles, controls and what actually works.</p>
+        </button>
+      </div>
+      <footer class="menu-foot">
+        <div class="you">
+          <label>You are</label>
+          <input id="nameInput" maxlength="18" placeholder="Chameleon" />
+          <span class="at">@</span>
+          <input id="usernameInput" maxlength="18" placeholder="username" />
+          <button id="saveNameBtn" class="ghost">Save</button>
+        </div>
+        <div id="netStatus" class="net-status">offline</div>
+      </footer>
+    </div>
+  </section>
+
+  <section id="screen-join" class="screen">
+    <div class="panel narrow">
+      <h2>Join a room</h2>
+      <p class="muted">Enter the room code your friend sent you, or paste their link.</p>
+      <input id="joinCode" class="code-input" maxlength="40" placeholder="ABC12" />
+      <div class="row">
+        <button id="joinGo" class="primary">Join</button>
+        <button class="ghost" data-action="menu">Back</button>
+      </div>
+      <h3>Invite by username</h3>
+      <p class="muted">If they are online, the invite pops up on their screen. If not, it waits for them.</p>
+      <div class="row">
+        <input id="inviteUser" maxlength="18" placeholder="their username" />
+        <button id="inviteGo" class="primary">Send invite</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="screen-browser" class="screen">
+    <div class="panel wide">
+      <div class="panel-head"><h2>Public rooms</h2>
+        <div class="row"><button id="refreshRooms" class="ghost">Refresh</button>
+        <button class="ghost" data-action="menu">Back</button></div>
+      </div>
+      <div id="roomList" class="room-list"></div>
+    </div>
+  </section>
+
+  <section id="screen-lobby" class="screen">
+    <div class="lobby">
+      <div class="lobby-main">
+        <div class="panel-head">
+          <h2 id="lobbyName">Room</h2>
+          <div class="code-chip">Code <b id="lobbyCode">—</b>
+            <button id="copyCode" class="ghost tiny">Copy</button>
+            <button id="copyLink" class="ghost tiny">Copy link</button>
+          </div>
+        </div>
+        <h3>Map</h3>
+        <div id="mapGrid" class="map-grid"></div>
+        <h3>Mode</h3>
+        <div id="modeList" class="mode-list"></div>
+      </div>
+
+      <aside class="lobby-side">
+        <h3>Players <span id="playerCount" class="muted"></span></h3>
+        <div id="playerList" class="player-list"></div>
+
+        <div class="host-only" id="hostOptions">
+          <h3>Room settings</h3>
+          <label class="opt">Bots <input id="optBots" type="number" min="0" max="15" value="3" /></label>
+          <label class="opt">Bot skill
+            <select id="optDifficulty"></select>
+          </label>
+          <label class="opt">Rounds <input id="optRounds" type="number" min="1" max="15" value="5" /></label>
+          <label class="opt check"><input id="optPrivate" type="checkbox" /> Private (hidden from the browser)</label>
+        </div>
+
+        <div class="lobby-invite">
+          <h3>Invite</h3>
+          <div class="row">
+            <input id="lobbyInviteUser" maxlength="18" placeholder="username" />
+            <button id="lobbyInviteGo" class="ghost">Invite</button>
+          </div>
+        </div>
+
+        <div class="lobby-actions">
+          <button id="readyBtn" class="primary big">Ready</button>
+          <button id="startBtn" class="primary big host-only">Start match</button>
+          <button id="leaveBtn" class="ghost">Leave room</button>
+        </div>
+      </aside>
+
+      <div class="lobby-chat">
+        <div id="lobbyChatLog" class="chat-log lobby"></div>
+        <form id="lobbyChatForm" autocomplete="off">
+          <input id="lobbyChatInput" maxlength="180" placeholder="Message the room…" />
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <section id="screen-results" class="screen">
+    <div class="panel wide">
+      <h2 id="resultTitle">Round over</h2>
+      <p id="resultSub" class="muted"></p>
+      <table class="results"><thead><tr><th>#</th><th>Player</th><th>Score</th><th>Tags</th><th>Survived</th><th>Best blend</th></tr></thead>
+      <tbody id="resultBody"></tbody></table>
+      <div class="row"><button id="resultContinue" class="primary">Continue</button></div>
+    </div>
+  </section>
+
+  <section id="screen-settings" class="screen">
+    <div class="panel wide">
+      <div class="panel-head"><h2>Settings</h2><button class="ghost" data-action="back">Back</button></div>
+      <div class="settings-grid">
+        <div>
+          <h3>Mouse &amp; view</h3>
+          <label class="opt">Sensitivity <input id="setSens" type="range" min="10" max="300" value="100" /><output id="setSensOut">1.00</output></label>
+          <label class="opt">Field of view <input id="setFov" type="range" min="60" max="110" value="78" /><output id="setFovOut">78</output></label>
+          <label class="opt check"><input id="setInvert" type="checkbox" /> Invert vertical look</label>
+          <label class="opt check"><input id="setToggleCrouch" type="checkbox" /> Hold-to-crouch off (toggle instead)</label>
+          <h3>Audio</h3>
+          <label class="opt">Master <input id="setMaster" type="range" min="0" max="100" value="80" /></label>
+          <label class="opt">Effects <input id="setSfx" type="range" min="0" max="100" value="90" /></label>
+          <label class="opt">Music <input id="setMusic" type="range" min="0" max="100" value="55" /></label>
+          <h3>Graphics</h3>
+          <label class="opt">Resolution <input id="setScale" type="range" min="50" max="150" value="100" /><output id="setScaleOut">100%</output></label>
+          <label class="opt check"><input id="setShowFps" type="checkbox" /> Show performance overlay</label>
+        </div>
+        <div>
+          <h3>Key bindings</h3>
+          <div id="bindList" class="bind-list"></div>
+          <button id="resetBinds" class="ghost">Reset to defaults</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="screen-profile" class="screen">
+    <div class="panel wide">
+      <div class="panel-head"><h2>Profile</h2><button class="ghost" data-action="menu">Back</button></div>
+      <div id="profileBody" class="profile-body"></div>
+    </div>
+  </section>
+
+  <section id="screen-help" class="screen">
+    <div class="panel wide scrolly">
+      <div class="panel-head"><h2>How to play</h2><button class="ghost" data-action="menu">Back</button></div>
+      <div class="help">
+        <h3>The round</h3>
+        <p>Every round splits the room into <b>hiders</b> and <b>hunters</b>. Hiders get a prep window to
+        find a spot, paint their body to match it and lock a pose. Then the hunters are released with
+        paint guns. Hiders win if even one of them is still unfound when the clock runs out.</p>
+
+        <h3>Hiding well</h3>
+        <ul>
+          <li><b>Position first, paint second.</b> Find a surface with clutter, shadow or pattern — a
+          flat wall shows your outline no matter how good the colour is.</li>
+          <li><b>Break the silhouette.</b> Crouch, lie flat, curl up, cling to a wall. A person-shape is
+          what gets spotted, not a hue.</li>
+          <li><b>Use the eyedropper.</b> The nearby-surfaces palette samples what is actually around you.
+          Auto-Mimic does the whole body in one press.</li>
+          <li><b>Then stop moving.</b> Motion is louder than colour.</li>
+        </ul>
+
+        <h3>Hunting well</h3>
+        <ul>
+          <li>Sweep a consistent route instead of wandering — you are looking for what changed.</li>
+          <li>Compare <em>shapes</em>, not colours. Look for a silhouette that does not belong.</li>
+          <li>Sonar Ping reveals anything with line of sight inside its radius. Save it for a room you
+          cannot read.</li>
+          <li>Shoot anything suspicious. Paint is free; time is not.</li>
+        </ul>
+
+        <h3>Controls</h3>
+        <div id="helpBinds" class="help-binds"></div>
+
+        <h3>Playing with friends</h3>
+        <p>Create a room and send the code or the link — anyone who opens it joins straight into your
+        lobby. If they are signed in with a username you can invite them by handle instead, and the
+        invite waits for them if they are offline.</p>
+
+        <h3>Fair play</h3>
+        <p>The server simulates every player itself and only tells your game about hiders you could
+        actually see, so wallhacks have nothing to draw. Movement, fire rate and every hit are checked
+        server-side. Repeat violations get you removed from the room.</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="invitePopup" class="invite-popup hidden">
+  <div class="invite-card">
+    <h3 id="inviteText">Someone invited you</h3>
+    <div class="row">
+      <button id="inviteAccept" class="primary">Join them</button>
+      <button id="inviteDecline" class="ghost">No thanks</button>
+    </div>
+  </div>
+</div>
+
+<div id="toasts" class="toasts"></div>
+<div id="perf" class="perf hidden"></div>
+<noscript><p class="noscript">Mecha Chameleon needs JavaScript and WebGL2.</p></noscript>
+
+<script type="module" src="/client/js/main.js"></script>
+</body>
+</html>
