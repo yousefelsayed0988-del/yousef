@@ -1,0 +1,11 @@
+{
+  "name": "orebound",
+  "private": true,
+  "type": "module",
+  "description": "A voxel survival game built with WebGL2 and no runtime dependencies.",
+  "scripts": {
+    "play": "node serve.mjs",
+    "smoke": "node tools/smoke.mjs",
+    "worldgen": "node tools/worldgen-report.mjs"
+  }
+}
