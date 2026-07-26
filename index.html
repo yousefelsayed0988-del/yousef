@@ -858,7 +858,7 @@ const ROOM_THEMES = [
    ========================================================================= */
 const ROOM_PAL = [
   { wall:'wallCream',   floor:'floorDarkBoard'   },  // 0  corridors
-  { wall:'oakPanel',    floor:'marble'           },  // 1  Entrance Hall
+  { wall:'oakBoards',   floor:'marble'           },  // 1  Entrance Hall
   { wall:'wallRose',    floor:'floorRedCarpet'   },  // 2  Parlour
   { wall:'wallMint',    floor:'floorCheckTile'   },  // 3  Kitchen
   { wall:'wallOxblood', floor:'floorDarkBoard'   },  // 4  Dining Room
@@ -866,7 +866,7 @@ const ROOM_PAL = [
   { wall:'wallSage',    floor:'floorPaleBoard'   },  // 6  Master Bedroom
   { wall:'wallTeal',    floor:'floorGreenCarpet' },  // 7  Child's Room
   { wall:'wallOchre',   floor:'floorRedCarpet'   },  // 8  Study
-  { wall:'oakPanel',    floor:'floorDarkBoard'   },  // 9  Library
+  { wall:'oakBoards',   floor:'floorDarkBoard'   },  // 9  Library
   { wall:'wallSand',    floor:'concrete'         },  // 10 Pantry
   { wall:'wallMint',    floor:'floorBlueLino'    },  // 11 Wash House
   { wall:'wallCream',   floor:'floorPaleBoard'   },  // 12 Nursery
@@ -3943,6 +3943,109 @@ const TEXGEN = {
     noiseOn(x, S, 24);
     return c;
   },
+  /* Panelled oak, the way a hall and a library were actually done: narrow
+     vertical boards with a V-groove between each, straight-grained, stained
+     dark and waxed. The baked burl map that used to be on these walls was a
+     single slab of chaotic figure that tiled once a metre, so a hall came
+     out looking like the inside of a walnut - and moired badly the moment
+     you turned your head. Vertical boards tile cleanly against the way the
+     wall UVs run, and give the torch a rank of edges to rake down. */
+  oakBoards(S){
+    const c = texCanvas(S), x = c.getContext('2d');
+    const px1 = Math.max(1, S/512);
+    x.fillStyle = '#4a3524'; x.fillRect(0, 0, S, S);
+    const N = 5, bw = S/N;
+    for (let i = 0; i < N; i++){
+      const bx = i*bw;
+      // each board gets its own value, because no two ever match
+      const tone = 0.82 + ((i*7919 % 23)/23) * 0.34;
+      const g = x.createLinearGradient(bx, 0, bx + bw, 0);
+      const mid = Math.round(74*tone), lo = Math.round(52*tone), hi = Math.round(92*tone);
+      g.addColorStop(0.00, 'rgb(' + lo + ',' + Math.round(lo*0.72) + ',' + Math.round(lo*0.48) + ')');
+      g.addColorStop(0.18, 'rgb(' + hi + ',' + Math.round(hi*0.72) + ',' + Math.round(hi*0.47) + ')');
+      g.addColorStop(0.82, 'rgb(' + mid + ',' + Math.round(mid*0.71) + ',' + Math.round(mid*0.46) + ')');
+      g.addColorStop(1.00, 'rgb(' + lo + ',' + Math.round(lo*0.70) + ',' + Math.round(lo*0.46) + ')');
+      x.fillStyle = g; x.fillRect(bx, 0, bw, S);
+      // straight grain running the length of the board
+      for (let k = 0; k < 26; k++){
+        const gx = bx + 2 + Math.random()*(bw - 4);
+        x.strokeStyle = 'rgba(' + (Math.random() < 0.6 ? '34,22,12,0.20' : '138,106,68,0.13') + ')';
+        x.lineWidth = px1 * (0.5 + Math.random()*1.1);
+        x.beginPath(); x.moveTo(gx, 0);
+        for (let q = 1; q <= 10; q++) x.lineTo(gx + Math.sin(q*0.9 + k)*px1*1.6, q*S/10);
+        x.stroke();
+      }
+      // the occasional knot
+      if ((i*31 % 7) < 2){
+        const ky = ((i*97) % 100)/100 * S, kx = bx + bw*0.5;
+        const rg = x.createRadialGradient(kx, ky, 0, kx, ky, bw*0.30);
+        rg.addColorStop(0, 'rgba(28,16,8,0.72)');
+        rg.addColorStop(0.45, 'rgba(58,38,20,0.40)');
+        rg.addColorStop(1, 'rgba(0,0,0,0)');
+        x.fillStyle = rg; x.beginPath(); x.ellipse(kx, ky, bw*0.22, bw*0.30, 0, 0, 7); x.fill();
+      }
+      // the V-groove between this board and the next: dark side, lit side
+      x.fillStyle = 'rgba(14,8,4,0.66)'; x.fillRect(bx + bw - px1*2.4, 0, px1*2.4, S);
+      x.fillStyle = 'rgba(168,134,92,0.16)'; x.fillRect(bx, 0, px1*1.2, S);
+    }
+    // wax gone cloudy, and damp coming up out of the skirting
+    blotches(x, S, 14, 'rgba(22,14,8,0.22)', S*0.03, S*0.20);
+    blotches(x, S, 8, 'rgba(126,108,74,0.10)', S*0.02, S*0.12);
+    const dg = x.createLinearGradient(0, S*0.72, 0, S);
+    dg.addColorStop(0, 'rgba(18,14,10,0)'); dg.addColorStop(1, 'rgba(18,14,10,0.34)');
+    x.fillStyle = dg; x.fillRect(0, S*0.72, S, S*0.28);
+    noiseOn(x, S, 11);
+    return c;
+  },
+  /* Painted softwood. Every skirting, dado rail and cornice in the house is
+     the same cream gloss laid on over the top of the last four coats, so it
+     has gone yellow in the flats, chipped back to bare pine on the arrises,
+     and collected sixty years of dust along every top edge. */
+  trimPaint(S){
+    const c = texCanvas(S), x = c.getContext('2d');
+    const px1 = Math.max(1, S/512);
+    const g = x.createLinearGradient(0, 0, 0, S);
+    g.addColorStop(0.00, '#cabfa4');
+    g.addColorStop(0.55, '#bdb096');
+    g.addColorStop(1.00, '#a99d84');
+    x.fillStyle = g; x.fillRect(0, 0, S, S);
+    // brush drag: long shallow ridges the length of the timber
+    for (let i = 0; i < 90; i++){
+      const py = Math.random()*S;
+      x.strokeStyle = 'rgba(' + (Math.random() < 0.5 ? '214,206,184,0.16' : '134,124,104,0.14') + ')';
+      x.lineWidth = px1 * (0.6 + Math.random()*1.5);
+      x.beginPath(); x.moveTo(0, py);
+      for (let k = 0; k <= 8; k++) x.lineTo(k*S/8, py + Math.sin(k*1.3 + i)*px1*1.4);
+      x.stroke();
+    }
+    // chips back to bare pine, and the old darker coat underneath
+    for (let i = 0; i < 26; i++){
+      const cx = Math.random()*S, cy = Math.random()*S, r = S*(0.006 + Math.random()*0.022);
+      x.fillStyle = 'rgba(150,118,78,' + (0.22 + Math.random()*0.26).toFixed(3) + ')';
+      x.beginPath(); x.ellipse(cx, cy, r*(1 + Math.random()), r, Math.random()*3, 0, 7); x.fill();
+      x.fillStyle = 'rgba(72,56,36,0.22)';
+      x.beginPath(); x.ellipse(cx + px1, cy + px1, r*0.7, r*0.55, Math.random()*3, 0, 7); x.fill();
+    }
+    // hairline crazing in the gloss
+    for (let i = 0; i < 40; i++){
+      let cx = Math.random()*S, cy = Math.random()*S, a = Math.random()*6.283;
+      x.strokeStyle = 'rgba(96,84,64,0.16)'; x.lineWidth = Math.max(1, px1*0.6);
+      x.beginPath(); x.moveTo(cx, cy);
+      for (let k = 0; k < 4; k++){
+        a += (Math.random()-0.5)*1.7;
+        cx += Math.cos(a)*S*0.022; cy += Math.sin(a)*S*0.022;
+        x.lineTo(cx, cy);
+      }
+      x.stroke();
+    }
+    // sixty years of dust settled along the upper edge
+    const dg = x.createLinearGradient(0, 0, 0, S*0.16);
+    dg.addColorStop(0, 'rgba(96,88,72,0.34)'); dg.addColorStop(1, 'rgba(96,88,72,0)');
+    x.fillStyle = dg; x.fillRect(0, 0, S, S*0.16);
+    blotches(x, S, 12, 'rgba(78,66,48,0.14)', S*0.02, S*0.13);
+    noiseOn(x, S, 12);
+    return c;
+  },
   waxCandle(S){
     const c = texCanvas(S), x = c.getContext('2d');
     x.fillStyle = '#e3dbc4'; x.fillRect(0,0,S,S);
@@ -5702,6 +5805,47 @@ function pushQuad(b, p, nrm, uv, ao){
   b.count += 4;
 }
 
+/* ======================================================================
+   JOINERY
+   ----------------------------------------------------------------------
+   Until now a wall in this house was one flat quad from the boards to the
+   ceiling. No skirting, no rail, no cornice - which is why every room read
+   as a painted box rather than as a room somebody had lived in, and why
+   the torch had nothing to catch on as it swept across.
+
+   A trim is a band running the length of a wall face, standing proud of
+   it. Three of them turn a box into a Victorian ground floor: the skirting
+   the boards die into, the dado rail at chair height, and the cornice
+   where the wall meets the ceiling. They cost three quads a band and they
+   are what the raking torchlight is for.
+   ====================================================================== */
+function pushTrim(b, side, y0, y1, out, uScale){
+  const A = side.p[0], B = side.p[1];      // the two ends of this wall at floor level
+  const n = side.n;
+  const ox = n[0]*out, oz = n[2]*out;
+  const u0 = side.u[0], u1 = side.u[1];
+  const us = uScale === undefined ? 1 : uScale;
+  // the face of the band
+  pushQuad(b,
+    [[A[0]+ox, y0, A[2]+oz], [B[0]+ox, y0, B[2]+oz],
+     [B[0]+ox, y1, B[2]+oz], [A[0]+ox, y1, A[2]+oz]],
+    n,
+    [[u0*us, y0*us], [u1*us, y0*us], [u1*us, y1*us], [u0*us, y1*us]],
+    [0.72, 0.72, 1, 1]);
+  // its top, which is the surface that catches the light
+  pushQuad(b,
+    [[A[0]+ox, y1, A[2]+oz], [B[0]+ox, y1, B[2]+oz], [B[0], y1, B[2]], [A[0], y1, A[2]]],
+    [0, 1, 0],
+    [[u0*us, 0], [u1*us, 0], [u1*us, out*us*4], [u0*us, out*us*4]],
+    [1, 1, 0.86, 0.86]);
+  // and its underside, which is the shadow that sells it
+  pushQuad(b,
+    [[A[0], y0, A[2]], [B[0], y0, B[2]], [B[0]+ox, y0, B[2]+oz], [A[0]+ox, y0, A[2]+oz]],
+    [0, -1, 0],
+    [[u0*us, 0], [u1*us, 0], [u1*us, out*us*4], [u0*us, out*us*4]],
+    [0.42, 0.42, 0.55, 0.55]);
+}
+
 function buildWorld(){
   // dispose old GPU meshes
   WORLD.statics = []; WORLD.doors = []; WORLD.props = []; WORLD.lamps = [];
@@ -5747,11 +5891,23 @@ function buildWorld(){
       if (walkableCell(nv)) continue;
       // the wall wears whatever the room it faces was decorated with;
       // the fuse box and the front door keep their steel
-      const texKey = (nv === 5 || nv === 6) ? 'steel' : palAt(x, y).wall;
+      const steelWall = (nv === 5 || nv === 6);
+      const texKey = steelWall ? 'steel' : palAt(x, y).wall;
       const b = bk(texKey);
       pushQuad(b, s.p, s.n,
         [[s.u[0], 0], [s.u[1], 0], [s.u[1], WALL_H], [s.u[0], WALL_H]],
         [s.ao[0]*0.62, s.ao[1]*0.62, s.ao[1], s.ao[0]]);
+
+      /* ---- and the joinery over the top of it. Painted softwood in every
+         room in the house, which is why it is all one texture: the same
+         four coats of the same cream, going yellow. ---- */
+      if (!steelWall){
+        const trim = bk('trimPaint');
+        pushTrim(trim, s, 0.00, 0.155, 0.030, 1.0);   // skirting
+        pushTrim(trim, s, 0.86, 0.925, 0.022, 1.0);   // dado rail, at chair height
+        pushTrim(trim, s, WALL_H - 0.20, WALL_H - 0.055, 0.045, 1.0);  // cornice
+        pushTrim(trim, s, WALL_H - 0.055, WALL_H, 0.024, 1.0);         // and its top step
+      }
     }
   }
 
@@ -6370,6 +6526,9 @@ function buildTextures(){
     chinaGlaze:   worn(TEXGEN.chinaGlaze, 0.5),
     greenBottle:  worn(TEXGEN.greenBottle, 0.6),
     dustSheet:    worn(TEXGEN.dustSheet, 1.15),
+    /* Painted softwood for every skirting, rail and cornice in the house */
+    trimPaint: worn(TEXGEN.trimPaint, 0.9),
+    oakBoards: worn(TEXGEN.oakBoards, 1.0),
     wood: baked('oakPanel', worn(TEXGEN.wood, 0.85)),
     concrete: baked('plasterWall', worn(TEXGEN.concrete, 1.3)),
     steel: baked('rustIron', worn(TEXGEN.steel, 0.7)),
@@ -9562,6 +9721,7 @@ const MAT_CLASS = {
   ember:       [0.20, 12, 0.05, 0.00]
 };
 const MAT_OF = {
+  trimPaint:'wood', oakBoards:'wood',
   // his own kit
   orcSkin:'flesh', fangIvory:'flesh', bone:'flesh', skin:'flesh', stubble:'flesh',
   maskLeather:'leather', bootStone:'leather', redBoot:'leather', leatherPouch:'leather', boot:'leather',
