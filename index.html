@@ -378,14 +378,17 @@ const S = Object.assign({}, DEFAULTS);
 try { Object.assign(S, JSON.parse(localStorage.getItem('hollowmere.settings') || '{}')); } catch(e){}
 function saveSettings(){ try{ localStorage.setItem('hollowmere.settings', JSON.stringify(S)); }catch(e){} }
 
+/* vol    - how many steps the torch beam is marched through the shadow map
+   relief - how hard the shader rakes light across painted surface detail
+   dirt   - lens grime and halation in the final pass                       */
 const QPRESETS = [
-  { name:'Low',    scale:0.45, tex:128, grain:0,     dust:0,   ca:0,   detail:0 },
-  { name:'Medium', scale:0.62, tex:256, grain:0.045, dust:26,  ca:0,   detail:1 },
-  { name:'High',   scale:0.86, tex:512, grain:0.075, dust:96,  ca:1,   detail:1 },
-  { name:'Ultra',  scale:1.0,  tex:1024, grain:0.105, dust:170, ca:1.8, detail:2, hero:2048 },
+  { name:'Low',    scale:0.45, tex:128, grain:0,     dust:0,   ca:0,   detail:0, vol:0,  relief:0.55, dirt:0 },
+  { name:'Medium', scale:0.62, tex:256, grain:0.045, dust:26,  ca:0,   detail:1, vol:8,  relief:0.85, dirt:0.5 },
+  { name:'High',   scale:0.86, tex:512, grain:0.075, dust:96,  ca:1,   detail:1, vol:14, relief:1.00, dirt:0.8 },
+  { name:'Ultra',  scale:1.0,  tex:1024, grain:0.105, dust:170, ca:1.8, detail:2, vol:22, relief:1.15, dirt:1.0, hero:2048 },
   /* Ultra 4K: the house at 2048, and the Lodger's own hide, mask, blades,
      trousers and boots baked at a true 4096 x 4096. Wants a real GPU. */
-  { name:'Ultra 4K', scale:1.0, tex:1024, grain:0.105, dust:170, ca:1.8, detail:2, hero:4096 }
+  { name:'Ultra 4K', scale:1.0, tex:1024, grain:0.105, dust:170, ca:1.8, detail:2, vol:30, relief:1.25, dirt:1.15, hero:4096 }
 ];
 function Q(){ return QPRESETS[S.q] || QPRESETS[2]; }
 
@@ -3630,45 +3633,156 @@ const TEXGEN = {
      Everything below is painted for the reference figure: sun-baked tan
      hide, dirty linen wraps, oiled dark leather, slate-teal canvas trousers
      and oxblood boot leather with iron furniture.                       */
+  /* =====================================================================
+     HIS HIDE
+     ---------------------------------------------------------------------
+     The house burned in 1974 with him inside it, and what came back up out
+     of the cellar has been wearing the same skin ever since. So this is not
+     a healthy man's colour and it is not an orc's either. It is grey-green
+     at the base, the shade meat goes when it has been somewhere cold and
+     dark for a long time, shot through with four things that all fight each
+     other: old burn scarring gone shiny and hairless, jaundice yellow under
+     the ribs, bruise purple where the blood settled and stayed, and raw
+     split-open red where the harness and the muzzle straps have worn
+     through. Over all of it, cellar filth.
+
+     It is also deliberately DARK. The old map sat at about 65% luminance,
+     which meant that the moment the torch found him he flared to white
+     plaster. A slab of a thing coming down a corridor should stay a slab.
+     ===================================================================== */
   orcSkin(S){
     const c = texCanvas(S), x = c.getContext('2d');
-    // base hide: warm tan with an olive undertone
+    const px1 = Math.max(1, S/512);
+
+    /* Base: cold grey-green, and DARK. He is lit by one torch in a black
+       house, so if his hide sits anywhere near the value of the plaster
+       behind him he stops being a shape in the dark and becomes the
+       brightest thing in the room. He should be read off his edges. */
     const g = x.createLinearGradient(0, 0, 0, S);
-    g.addColorStop(0, '#b28a5e'); g.addColorStop(0.5, '#a37c50'); g.addColorStop(1, '#8f6a43');
+    g.addColorStop(0.00, '#3d4033');
+    g.addColorStop(0.42, '#34372c');
+    g.addColorStop(1.00, '#2b2d24');
     x.fillStyle = g; x.fillRect(0, 0, S, S);
-    // broad tonal mottling - sunburn, grime, old bruising
-    blotches(x, S, 40, 'rgba(120,84,50,0.30)', S*0.03, S*0.22);
-    blotches(x, S, 26, 'rgba(198,158,116,0.22)', S*0.02, S*0.16);
-    blotches(x, S, 14, 'rgba(96,58,44,0.20)', S*0.04, S*0.20);
-    // veins across the muscle bellies
+
+    // ---- broad tonal drift, so no two square inches read the same
+    blotches(x, S, 34, 'rgba(56,58,44,0.34)', S*0.05, S*0.26);   // deeper green shadow
+    blotches(x, S, 22, 'rgba(112,110,80,0.20)', S*0.03, S*0.18);  // where it has dried pale
+    blotches(x, S, 16, 'rgba(104,88,38,0.20)', S*0.04, S*0.22);   // jaundice
+    blotches(x, S, 13, 'rgba(58,38,64,0.24)', S*0.04, S*0.20);    // settled bruise
+    blotches(x, S, 10, 'rgba(96,34,28,0.16)', S*0.02, S*0.13);    // raw and angry
+
+    // ---- burn scarring: wide hairless plates of keloid, shiny and taut,
+    //      with a blackened crackle at the edge where the fire stopped
+    for (let i = 0; i < 7; i++){
+      const cx = Math.random()*S, cy = Math.random()*S, r = S*(0.07 + Math.random()*0.15);
+      const rg = x.createRadialGradient(cx, cy, r*0.15, cx, cy, r);
+      rg.addColorStop(0.00, 'rgba(150,120,104,0.40)');
+      rg.addColorStop(0.55, 'rgba(116,88,74,0.30)');
+      rg.addColorStop(0.86, 'rgba(40,26,20,0.34)');
+      rg.addColorStop(1.00, 'rgba(0,0,0,0)');
+      x.fillStyle = rg; x.beginPath(); x.arc(cx, cy, r, 0, 7); x.fill();
+      // the crackle: short broken fissures radiating out of the burn
+      x.lineCap = 'round';
+      for (let k = 0; k < 22; k++){
+        const a = Math.random()*6.283, r0 = r*(0.30 + Math.random()*0.55);
+        x.strokeStyle = 'rgba(26,17,13,' + (0.14 + Math.random()*0.20).toFixed(3) + ')';
+        x.lineWidth = px1 * (0.7 + Math.random()*1.1);
+        x.beginPath();
+        x.moveTo(cx + Math.cos(a)*r0, cy + Math.sin(a)*r0);
+        x.lineTo(cx + Math.cos(a + 0.3)*(r0 + r*0.22), cy + Math.sin(a + 0.3)*(r0 + r*0.22));
+        x.stroke();
+      }
+    }
+
+    // ---- deep veins: dark, slow, branching, the colour of old ink
     x.lineCap = 'round';
-    for (let i = 0; i < 22; i++){
-      let px = Math.random()*S, py = Math.random()*S;
-      x.strokeStyle = 'rgba(92,60,54,' + (0.07 + Math.random()*0.09).toFixed(3) + ')';
-      x.lineWidth = Math.max(1, S/300) * (0.6 + Math.random());
-      x.beginPath(); x.moveTo(px, py);
-      for (let s = 0; s < 5; s++){
-        px += (Math.random()-0.5)*S*0.10; py += (Math.random()-0.5)*S*0.10;
-        x.lineTo(px, py);
+    for (let i = 0; i < 26; i++){
+      let vx = Math.random()*S, vy = Math.random()*S;
+      let a = Math.random()*6.283;
+      x.strokeStyle = 'rgba(34,44,42,' + (0.10 + Math.random()*0.13).toFixed(3) + ')';
+      x.lineWidth = px1 * (1.1 + Math.random()*1.6);
+      x.beginPath(); x.moveTo(vx, vy);
+      for (let s = 0; s < 7; s++){
+        a += (Math.random()-0.5)*0.9;
+        vx += Math.cos(a)*S*0.045; vy += Math.sin(a)*S*0.045;
+        x.lineTo(vx, vy);
+      }
+      x.stroke();
+      // a finer branch off the last third
+      x.lineWidth = px1 * 0.8;
+      x.strokeStyle = 'rgba(34,44,42,0.09)';
+      x.beginPath(); x.moveTo(vx, vy);
+      for (let s = 0; s < 3; s++){
+        a += (Math.random()-0.5)*1.4;
+        vx += Math.cos(a)*S*0.030; vy += Math.sin(a)*S*0.030;
+        x.lineTo(vx, vy);
       }
       x.stroke();
     }
-    // scars: pale raised lines with a dark edge
+
+    // ---- broken capillaries: fine red threads, the only warm thing on him
+    for (let i = 0; i < 46; i++){
+      let vx = Math.random()*S, vy = Math.random()*S, a = Math.random()*6.283;
+      x.strokeStyle = 'rgba(124,38,30,' + (0.07 + Math.random()*0.10).toFixed(3) + ')';
+      x.lineWidth = Math.max(1, px1*0.7);
+      x.beginPath(); x.moveTo(vx, vy);
+      for (let s = 0; s < 4; s++){
+        a += (Math.random()-0.5)*1.6;
+        vx += Math.cos(a)*S*0.016; vy += Math.sin(a)*S*0.016;
+        x.lineTo(vx, vy);
+      }
+      x.stroke();
+    }
+
+    // ---- old cuts: a pale raised weal with a dark shadow under one side
+    for (let i = 0; i < 14; i++){
+      const sx = Math.random()*S, sy = Math.random()*S, a = Math.random()*6.283,
+            len = S*(0.05 + Math.random()*0.20);
+      const ex = sx + Math.cos(a)*len, ey = sy + Math.sin(a)*len;
+      const nx = -Math.sin(a)*px1*1.4, ny = Math.cos(a)*px1*1.4;
+      x.strokeStyle = 'rgba(30,20,16,0.32)'; x.lineWidth = px1*2.0;
+      x.beginPath(); x.moveTo(sx - nx, sy - ny); x.lineTo(ex - nx, ey - ny); x.stroke();
+      x.strokeStyle = 'rgba(158,138,118,0.30)'; x.lineWidth = px1*1.5;
+      x.beginPath(); x.moveTo(sx, sy); x.lineTo(ex, ey); x.stroke();
+      // stitch marks across a few of them - somebody closed these once
+      if (i % 4 === 0){
+        x.strokeStyle = 'rgba(24,16,12,0.28)'; x.lineWidth = Math.max(1, px1*0.8);
+        const n = Math.max(3, Math.floor(len/(S*0.022)));
+        for (let k = 1; k < n; k++){
+          const t = k/n, mx = sx + (ex-sx)*t, my = sy + (ey-sy)*t;
+          x.beginPath();
+          x.moveTo(mx - nx*2.4, my - ny*2.4);
+          x.lineTo(mx + nx*2.4, my + ny*2.4);
+          x.stroke();
+        }
+      }
+    }
+
+    // ---- pores and follicle stipple: what stops flesh reading as rubber
+    for (let i = 0; i < S*S*0.010; i++){
+      const ppx = Math.random()*S, ppy = Math.random()*S;
+      x.fillStyle = 'rgba(34,36,26,' + (0.05 + Math.random()*0.13).toFixed(3) + ')';
+      x.fillRect(ppx, ppy, px1, px1);
+    }
+    for (let i = 0; i < S*S*0.003; i++){
+      const ppx = Math.random()*S, ppy = Math.random()*S;
+      x.fillStyle = 'rgba(146,142,116,' + (0.04 + Math.random()*0.09).toFixed(3) + ')';
+      x.fillRect(ppx, ppy, px1, px1);
+    }
+
+    // ---- cellar filth, laid on last so it sits in everything else
+    blotches(x, S, 20, 'rgba(22,20,14,0.22)', S*0.02, S*0.15);
+    // and old blood, dried to near-black, that was never his
     for (let i = 0; i < 9; i++){
-      const px = Math.random()*S, py = Math.random()*S, a = Math.random()*6.283,
-            len = S*(0.06 + Math.random()*0.16);
-      x.strokeStyle = 'rgba(214,180,150,0.34)'; x.lineWidth = Math.max(1, S/260);
-      x.beginPath(); x.moveTo(px, py); x.lineTo(px+Math.cos(a)*len, py+Math.sin(a)*len); x.stroke();
-      x.strokeStyle = 'rgba(72,44,34,0.28)'; x.lineWidth = Math.max(1, S/420);
-      x.beginPath(); x.moveTo(px+2, py+2); x.lineTo(px+Math.cos(a)*len+2, py+Math.sin(a)*len+2); x.stroke();
+      const cx = Math.random()*S, cy = Math.random()*S, r = S*(0.02 + Math.random()*0.07);
+      const rg = x.createRadialGradient(cx, cy, 0, cx, cy, r);
+      rg.addColorStop(0, 'rgba(48,10,8,0.42)');
+      rg.addColorStop(0.7, 'rgba(34,12,10,0.20)');
+      rg.addColorStop(1, 'rgba(0,0,0,0)');
+      x.fillStyle = rg; x.beginPath(); x.arc(cx, cy, r, 0, 7); x.fill();
     }
-    // pores
-    for (let i = 0; i < S*S*0.004; i++){
-      const px = Math.random()*S, py = Math.random()*S;
-      x.fillStyle = 'rgba(70,46,30,' + (0.05 + Math.random()*0.10).toFixed(3) + ')';
-      x.fillRect(px, py, Math.max(1, S/512), Math.max(1, S/512));
-    }
-    noiseOn(x, S, 16);
+
+    noiseOn(x, S, 13);
     return c;
   },
   maskLeather(S){
@@ -4496,6 +4610,7 @@ in vec3 vPos; in vec3 vNrm; in vec2 vUV; in float vAO; in vec4 vLightPos;
 out vec4 outColor;
 uniform sampler2D uTex;
 uniform sampler2DShadow uShadow;
+uniform mat4 uLightVP;
 uniform vec3 uCamPos;
 uniform vec3 uFlashPos, uFlashDir;
 uniform vec4 uFlashParams;   // cosInner, cosOuter, range, intensity
@@ -4509,44 +4624,180 @@ uniform vec4 uLightPos[6];   // xyz + range
 uniform vec3 uLightCol[6];
 uniform float uShadowOn;
 uniform float uShadowTexel;
+uniform float uTimeS;
+/* per-material look: x bump strength, y specular power, z specular amount,
+   w subsurface (how much light bleeds through flesh and cloth)            */
+uniform vec4 uMat;
+/* volumetrics: x step count, y strength */
+uniform vec2 uVol;
+/* his eyes, carried as a tiny red point light so the sockets throw colour
+   onto whatever he is leaning over */
+uniform vec4 uEmber;         // xyz position, w intensity
 
-float shadowFactor(){
+const float PI = 3.14159265;
+
+float lum(vec3 c){ return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+
+/* ---- a tangent frame built from screen-space derivatives. The meshes carry
+   no tangents, so we derive one per pixel from the UV gradient. ---- */
+mat3 cotangentFrame(vec3 N, vec3 p, vec2 uv){
+  vec3 dp1 = dFdx(p), dp2 = dFdy(p);
+  vec2 duv1 = dFdx(uv), duv2 = dFdy(uv);
+  vec3 dp2perp = cross(dp2, N), dp1perp = cross(N, dp1);
+  vec3 T = dp2perp * duv1.x + dp1perp * duv2.x;
+  vec3 B = dp2perp * duv1.y + dp1perp * duv2.y;
+  float inv = inversesqrt(max(max(dot(T,T), dot(B,B)), 1e-8));
+  return mat3(T * inv, B * inv, N);
+}
+
+/* ---- relief straight off the albedo. Every material in this game is a
+   painted canvas, so its own luminance is a height field: mortar lines sit
+   lower than brick, a leather crease lower than the hide beside it. Reading
+   four taps and tilting the normal costs almost nothing and turns every flat
+   painted surface into something the torch can rake across. ---- */
+vec3 reliefNormal(vec3 N, float strength){
+  if (strength <= 0.001) return N;
+  vec2 e = clamp(fwidth(vUV), vec2(1.0/4096.0), vec2(1.0/64.0));
+  float hL = lum(texture(uTex, vUV - vec2(e.x, 0.0)).rgb);
+  float hR = lum(texture(uTex, vUV + vec2(e.x, 0.0)).rgb);
+  float hD = lum(texture(uTex, vUV - vec2(0.0, e.y)).rgb);
+  float hU = lum(texture(uTex, vUV + vec2(0.0, e.y)).rgb);
+  mat3 TBN = cotangentFrame(N, vPos, vUV);
+  vec3 bumped = N + (TBN[0] * (hL - hR) + TBN[1] * (hD - hU)) * strength * 6.0;
+  return normalize(bumped);
+}
+
+/* ---- 12-tap Poisson PCF, rotated per pixel so the penumbra dithers instead
+   of banding, with a normal offset so nothing shadow-acnes itself. ---- */
+const vec2 POISSON[12] = vec2[12](
+  vec2(-0.326, -0.406), vec2(-0.840, -0.074), vec2(-0.696,  0.457),
+  vec2(-0.203,  0.621), vec2( 0.962, -0.195), vec2( 0.473, -0.480),
+  vec2( 0.519,  0.767), vec2( 0.185, -0.893), vec2( 0.507,  0.064),
+  vec2( 0.896,  0.412), vec2(-0.322, -0.933), vec2(-0.792, -0.598)
+);
+
+float shadowFactor(vec3 N, vec3 Ld){
   if (uShadowOn < 0.5) return 1.0;
-  vec3 p = vLightPos.xyz / vLightPos.w;
+
+  /* Normal-offset shadows. Sampling the map at the surface itself is what
+     made every small rounded detail on the Lodger - his pectorals, the
+     slabs down his abdomen, the caps of his shoulders - come back fully
+     occluded, so a lit body had flat black discs punched through it. We
+     walk the sample point a texel's worth of world space out along the
+     surface normal first, and further the more obliquely the light hits,
+     so a curved 30 mm blob cannot shadow its own front face. */
+  float slope = clamp(1.0 - abs(dot(N, Ld)), 0.0, 1.0);
+  float texelWorld = uShadowTexel * max(length(uCamPos - vPos), 0.6) * 2.6;
+  vec3 off = N * texelWorld * (1.2 + 5.0 * slope);
+  vec4 lp = uLightVP * vec4(vPos + off, 1.0);
+  vec3 p = lp.xyz / lp.w;
   p = p * 0.5 + 0.5;
   if (p.z > 1.0 || p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0) return 1.0;
-  float bias = 0.0016;
+  float bias = 0.0016 + 0.0060 * slope * slope;
+  float ang = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) * 6.2831853;
+  float ca = cos(ang), sa = sin(ang);
+  mat2 rot = mat2(ca, -sa, sa, ca);
   float s = 0.0;
-  for (int y=-1; y<=1; y++)
-    for (int x=-1; x<=1; x++)
-      s += texture(uShadow, vec3(p.xy + vec2(float(x), float(y)) * uShadowTexel, p.z - bias));
-  return s / 9.0;
+  for (int i = 0; i < 12; i++)
+    s += texture(uShadow, vec3(p.xy + (rot * POISSON[i]) * uShadowTexel * 1.35, p.z - bias));
+  return s / 12.0;
+}
+
+/* ---- the beam itself. Dust and damp in a shut-up house make the torch a
+   solid cone of light, and doorways cut god-rays out of it. We march the
+   view ray against the same shadow map the surfaces use. ---- */
+float beam(vec3 wp){
+  int steps = int(uVol.x);
+  if (steps < 1 || uShadowOn < 0.5 || uFlashParams.w <= 0.001) return 0.0;
+  vec3 ro = uCamPos;
+  vec3 rd = wp - ro;
+  float far = min(length(rd), uFlashParams.z);
+  rd = normalize(rd);
+  float dither = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233)) + uTimeS * 7.13) * 43758.5453);
+  float stepLen = far / float(steps);
+  vec3 p = ro + rd * stepLen * dither;
+  float acc = 0.0;
+  for (int i = 0; i < 40; i++){
+    if (i >= steps) break;
+    vec3 Ld = uFlashPos - p;
+    float dl = length(Ld);
+    Ld /= max(dl, 0.0001);
+    float cone = smoothstep(uFlashParams.y, uFlashParams.x, dot(-Ld, uFlashDir));
+    if (cone > 0.002){
+      float at = clamp(1.0 - dl / uFlashParams.z, 0.0, 1.0); at *= at;
+      vec4 lp = uLightVP * vec4(p, 1.0);
+      vec3 sp = lp.xyz / lp.w * 0.5 + 0.5;
+      float vis = 1.0;
+      if (sp.z < 1.0 && sp.x > 0.0 && sp.x < 1.0 && sp.y > 0.0 && sp.y < 1.0)
+        vis = texture(uShadow, vec3(sp.xy, sp.z - 0.0026));
+      /* Forward-scattering phase. The air in here is barely dusty, so the
+         off-axis term is almost nothing - you only see the shaft when you
+         are looking down the beam, which is exactly when it should appear. */
+      float ph = 0.018 + 0.40 * pow(max(dot(rd, -Ld), 0.0), 6.0);
+      acc += cone * at * vis * ph;
+    }
+    p += rd * stepLen;
+  }
+  return min(acc * stepLen * uVol.y * uFlashParams.w, 0.55);
 }
 
 void main(){
   vec4 texel = texture(uTex, vUV);
   vec3 albedo = texel.rgb * uTint;
-  vec3 N = normalize(vNrm);
   vec3 V = normalize(uCamPos - vPos);
 
-  vec3 lit = uAmbient * albedo * mix(0.55, 1.0, vAO);
+  /* Every primitive in this game winds the same way, but they do not all
+     agree on which way their normals point: loft() derives its normals from
+     that winding, while blob(), sphere() and cyl() push analytic outward
+     normals instead. The two are opposites, which is why every detail built
+     out of blobs - his pectorals, the slabs down his abdomen, the caps on
+     his shoulders, the studs, the tusks - came out as flat black holes cut
+     in a lit body. Backfaces are culled, so anything we can actually see is
+     facing us; flipping the normal to agree with that is a no-op on the
+     geometry that was already right and a repair on everything else. */
+  vec3 Ng = normalize(vNrm);
+  if (dot(Ng, V) < 0.0) Ng = -Ng;
+  vec3 N  = reliefNormal(Ng, uMat.x);
+  float ao = mix(0.50, 1.0, vAO);
+
+  // ---- ambient, with a little sky-vs-ground tint so nothing is dead flat
+  float up = N.y * 0.5 + 0.5;
+  vec3 lit = uAmbient * albedo * ao * mix(0.72, 1.25, up);
 
   // ---- torch (spot light) with soft cone + inverse-square falloff
   vec3 Ld = uFlashPos - vPos;
   float dist = length(Ld);
   Ld /= max(dist, 0.0001);
-  float spot = dot(-Ld, normalize(uFlashDir));
+  float spot = dot(-Ld, uFlashDir);
   float cone = smoothstep(uFlashParams.y, uFlashParams.x, spot);
   float atten = clamp(1.0 - dist / uFlashParams.z, 0.0, 1.0);
   atten *= atten;
   float ndl = max(dot(N, Ld), 0.0);
-  float sh = shadowFactor();
+  float sh = shadowFactor(Ng, Ld);
   float torch = cone * atten * uFlashParams.w * sh;
-  torch = torch / (1.0 + torch * 0.55);   // soft knee: nothing blows out up close
+  torch = torch / (1.0 + torch * 0.62);   // soft knee: nothing blows out up close
+
+  // wrapped diffuse - skin and cloth do not fall to black at the terminator
+  float wrap = uMat.w;
+  float diff = clamp((ndl + wrap) / (1.0 + wrap), 0.0, 1.0);
+  lit += albedo * diff * torch * ao;
+
+  // subsurface: light coming through the thin parts, ears, fingers, linen
+  if (wrap > 0.01){
+    float back = pow(clamp(dot(V, -Ld) * 0.5 + 0.5, 0.0, 1.0), 3.0);
+    lit += albedo * vec3(1.25, 0.52, 0.42) * back * wrap * torch * 0.55;
+  }
+
+  // ---- specular: tight and bright on iron and blades, broad and dull on plaster
   vec3 H = normalize(Ld + V);
-  float spec = pow(max(dot(N, H), 0.0), 42.0) * 0.30 * torch;
-  lit += albedo * (ndl * 0.92 + 0.14) * torch * mix(0.6, 1.0, vAO);
-  lit += vec3(spec) * torch;
+  float spec = pow(max(dot(N, H), 0.0), uMat.y) * uMat.z * torch;
+  float fres = pow(1.0 - clamp(dot(N, V), 0.0, 1.0), 5.0);
+  spec *= mix(1.0, 3.4, fres);
+  lit += vec3(spec) * (0.85 + 0.15 * lum(albedo));
+
+  // ---- rim: the one thing that keeps a dark silhouette from becoming a hole
+  float rim = pow(1.0 - clamp(dot(N, V), 0.0, 1.0), 3.2);
+  lit += albedo * rim * (torch * 0.30 + 0.045) * mix(0.5, 1.0, vAO);
 
   // ---- point lights (ceiling bulbs once the power is back)
   for (int i=0; i<6; i++){
@@ -4555,14 +4806,32 @@ void main(){
     float dl = length(d);
     float a = clamp(1.0 - dl / uLightPos[i].w, 0.0, 1.0);
     a *= a;
+    vec3 pl = d / max(dl, 0.0001);
+    float nd = clamp((dot(N, pl) + wrap) / (1.0 + wrap), 0.0, 1.0);
+    lit += albedo * uLightCol[i] * (nd * 0.85 + 0.15) * a * ao;
+    vec3 ph = normalize(pl + V);
+    lit += uLightCol[i] * pow(max(dot(N, ph), 0.0), uMat.y) * uMat.z * a * 0.5;
+  }
+
+  // ---- his eyes, throwing red on whatever is in front of him
+  if (uEmber.w > 0.001){
+    vec3 d = uEmber.xyz - vPos;
+    float dl = length(d);
+    float a = clamp(1.0 - dl / 2.0, 0.0, 1.0); a *= a * a;
     float nd = max(dot(N, d / max(dl, 0.0001)), 0.0);
-    lit += albedo * uLightCol[i] * (nd * 0.85 + 0.15) * a * mix(0.5, 1.0, vAO);
+    lit += albedo * vec3(1.0, 0.17, 0.05) * (nd * 0.85 + 0.15) * a * uEmber.w;
   }
 
   lit += albedo * uGlow;
 
-  float fog = 1.0 - exp(-uFogDensity * dist * dist * 0.06);
+  // ---- fog, thicker low down where the damp sits
+  float heightFade = exp(-max(vPos.y - 0.15, 0.0) * 0.42);
+  float fog = 1.0 - exp(-uFogDensity * dist * dist * 0.06 * mix(0.75, 1.5, heightFade));
   lit = mix(lit, uFogColor, clamp(fog, 0.0, 0.92));
+
+  // ---- and the beam laid over the top of everything
+  lit += vec3(0.92, 0.86, 0.74) * beam(vPos);
+
   outColor = vec4(lit, 1.0);
 }`;
 
@@ -4583,10 +4852,19 @@ const FS_BRIGHT = `#version 300 es
 precision highp float;
 in vec2 vUV; out vec4 o;
 uniform sampler2D uTex;
+uniform vec2 uTexel;
 void main(){
-  vec3 c = texture(uTex, vUV).rgb;
+  // a 5-tap box before the threshold: single-pixel speculars used to alias
+  // into a crawling sparkle once they were blurred up
+  vec3 c = texture(uTex, vUV).rgb * 0.4;
+  c += texture(uTex, vUV + vec2( uTexel.x,  uTexel.y)).rgb * 0.15;
+  c += texture(uTex, vUV + vec2(-uTexel.x,  uTexel.y)).rgb * 0.15;
+  c += texture(uTex, vUV + vec2( uTexel.x, -uTexel.y)).rgb * 0.15;
+  c += texture(uTex, vUV + vec2(-uTexel.x, -uTexel.y)).rgb * 0.15;
   float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
-  o = vec4(c * smoothstep(0.42, 0.95, l), 1.0);
+  // soft knee so a lamp does not pop into bloom the instant it crosses
+  float k = smoothstep(0.30, 0.88, l);
+  o = vec4(c * k * k, 1.0);
 }`;
 
 const FS_BLUR = `#version 300 es
@@ -4606,32 +4884,118 @@ precision highp float;
 in vec2 vUV; out vec4 o;
 uniform sampler2D uScene;
 uniform sampler2D uBloom;
+uniform sampler2D uBloomWide;
 uniform float uTime, uGrain, uBright, uCA, uVig, uFear, uBloomAmt, uFlash;
+/* x heartbeat 0..1, y wound (blood on the lens), z breath fog, w lens dirt */
+uniform vec4 uState;
+/* x hide-in-the-dark letterbox, y hurt desaturation, z time-of-death fade */
+uniform vec3 uState2;
+
 float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise(vec2 p){
+  vec2 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1,0)), f.x),
+             mix(hash(i + vec2(0,1)), hash(i + vec2(1,1)), f.x), f.y);
+}
+float fbm(vec2 p){
+  float v = 0.0, a = 0.5;
+  for (int i = 0; i < 4; i++){ v += a * noise(p); p *= 2.03; a *= 0.5; }
+  return v;
+}
+
+/* ACES filmic, the full fitted curve rather than the cheap approximation -
+   it holds highlight colour instead of skewing everything to white. */
+vec3 aces(vec3 x){
+  const mat3 IN = mat3(0.59719, 0.07600, 0.02840,
+                       0.35458, 0.90834, 0.13383,
+                       0.04823, 0.01566, 0.83777);
+  const mat3 OUT = mat3( 1.60475, -0.10208, -0.00327,
+                        -0.53108,  1.10813, -0.07276,
+                        -0.07367, -0.00605,  1.07602);
+  vec3 v = IN * x;
+  vec3 a = v * (v + 0.0245786) - 0.000090537;
+  vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081;
+  return clamp(OUT * (a / b), 0.0, 1.0);
+}
+
 void main(){
   vec2 uv = vUV;
   vec2 d = uv - 0.5;
   float r2 = dot(d, d);
-  // barrel + chromatic aberration, pushed by fear
-  float ca = (uCA + uFear * 2.4) * 0.0014;
+  float beat = uState.x;
+
+  // ---- the lens: barrel distortion and chromatic fringing, both pushed by
+  //      fear and by your own pulse in your ears
+  float warp = (0.012 + uFear * 0.030 + beat * 0.016);
+  uv = uv + d * r2 * warp;
+  float ca = (uCA + uFear * 2.6 + beat * 1.2) * 0.0016;
   vec3 c;
-  c.r = texture(uScene, uv + d * ca * 1.6).r;
+  c.r = texture(uScene, uv + d * ca * 1.7).r;
   c.g = texture(uScene, uv).g;
-  c.b = texture(uScene, uv - d * ca * 1.6).b;
-  c += texture(uBloom, uv).rgb * uBloomAmt;
-  // filmic tonemap
-  c = (c * (2.51 * c + 0.03)) / (c * (2.43 * c + 0.59) + 0.14);
-  c *= uBright;
-  // vignette
-  c *= mix(1.0, clamp(1.25 - r2 * 2.35, 0.0, 1.0), uVig);
-  // fear desaturation + red creep
-  float lum = dot(c, vec3(0.299, 0.587, 0.114));
+  c.b = texture(uScene, uv - d * ca * 1.7).b;
+
+  // ---- bloom: a tight pass for glints and a wide one for halation, so
+  //      lamps bleed the way film bleeds instead of glowing like a decal
+  vec3 tight = texture(uBloom, uv).rgb;
+  vec3 wide  = texture(uBloomWide, uv).rgb;
+  c += tight * uBloomAmt;
+  c += wide * uBloomAmt * 0.50 * vec3(1.12, 0.92, 0.72);
+
+  // ---- lens dirt: the halation catches on grease and dust on the glass
+  if (uState.w > 0.001){
+    float grime = fbm(uv * 7.0 + 3.1) * fbm(uv * 23.0 - 1.7);
+    c += wide * grime * uState.w * 2.6;
+  }
+
+  /* Exposure, then the film curve. The full fitted ACES transform is
+     scene-referred - it puts 18% grey down at about 0.10 - so the frame has
+     to be exposed up into it or the whole house goes to mud. */
+  c *= uBright * 2.05;
+  c = aces(c);
+
+  // ---- grade: cold shadows, warm lamplight. This is the whole look.
+  float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
+  vec3 shadowT = vec3(0.74, 0.88, 1.14);
+  vec3 highT   = vec3(1.10, 1.01, 0.86);
+  c *= mix(shadowT, highT, smoothstep(0.05, 0.55, lum));
+  c = mix(vec3(lum), c, 1.06);                       // a touch more colour
+  c = clamp((c - 0.5) * 1.045 + 0.5, 0.0, 1.6);      // a touch more contrast
+
+  // ---- vignette, and a second tighter one when you are hidden
+  c *= mix(1.0, clamp(1.28 - r2 * 2.30, 0.0, 1.0), uVig);
+  if (uState2.x > 0.001){
+    float slot = smoothstep(0.44, 0.16, abs(d.y)) * smoothstep(0.52, 0.30, abs(d.x));
+    c *= mix(1.0, mix(0.06, 1.0, slot), uState2.x);
+  }
+
+  // ---- fear: desaturate, creep red into the corners, and squeeze with the pulse
   c = mix(c, vec3(lum * 1.02, lum * 0.86, lum * 0.84), uFear * 0.55);
-  c += vec3(0.10, 0.0, 0.0) * uFear * r2 * 1.6;
+  c += vec3(0.11, 0.005, 0.0) * uFear * r2 * 1.7;
+  c *= 1.0 - beat * r2 * 0.55;
+
+  // ---- blood on the lens when he has opened you up
+  if (uState.y > 0.001){
+    float sm = fbm(uv * 4.5 + 11.3);
+    float sp = smoothstep(0.42, 0.86, sm * (0.55 + r2 * 2.2));
+    c = mix(c, c * vec3(0.62, 0.055, 0.045), sp * uState.y);
+    c += vec3(0.16, 0.0, 0.0) * uState.y * r2;
+  }
+
+  // ---- your own breath, when you are crouched and holding still
+  if (uState.z > 0.001){
+    float bf = fbm(uv * 3.2 + vec2(uTime * 0.09, -uTime * 0.05));
+    c += vec3(0.055, 0.060, 0.070) * bf * uState.z * smoothstep(0.0, 0.30, r2);
+  }
+
   c += vec3(uFlash);
-  // grain
+
+  // ---- grain, scaled so it lives in the shadows like real film
   float g = hash(uv * vec2(1024.0, 640.0) + fract(uTime) * 91.7) - 0.5;
-  c += g * uGrain;
+  c += g * uGrain * mix(1.7, 0.45, smoothstep(0.0, 0.6, lum));
+
+  // ---- and the fade to black when the house takes you
+  c *= 1.0 - clamp(uState2.z, 0.0, 1.0);
   o = vec4(c, 1.0);
 }`;
 
@@ -5258,7 +5622,10 @@ const P = {
   vx: 0, vz: 0, crouch: 0, crouchT: 0,
   stam: 1, bat: 1, torch: true, fear: 0,
   fuses: 0, notes: 0, bobT: 0, bob: 0,
-  alive: true, startTime: 0, powerOn: false, sprinting: false, moving: 0
+  alive: true, startTime: 0, powerOn: false, sprinting: false, moving: 0,
+  /* what the lens shows about the state of you: your pulse, the blood he
+     has already taken, the fog of your own breath, and the fade at the end */
+  beat: 0, wound: 0, breathFog: 0, fadeOut: 0, beatPhase: 0
 };
 
 const V = {
@@ -5280,7 +5647,10 @@ function buildTextures(){
   const gen = {
     brick: baked('brickWall', worn(TEXGEN.brick, 1.15)),
     // ---- the Lodger's own material set ----
-    orcSkin:     hued(TEXGEN.orcSkin, 146, 96, 12, 1.16, 0.94, 0.72, 16),
+    /* His hide is painted with its own colour now, so it must NOT go through
+       hued() - that collapses everything to luminance and remaps it, which is
+       exactly what turned him into a plaster statue. Only wear it in. */
+    orcSkin:     worn(TEXGEN.orcSkin, 1.0),
     maskLeather: worn(TEXGEN.maskLeather, 1.0),
     wrapCloth:   worn(TEXGEN.wrapCloth, 1.1),
     tealTrouser: worn(TEXGEN.tealTrouser, 0.95),
@@ -6284,8 +6654,19 @@ function updateVillain(dt){
   if (dist < 0.72 && P.alive && !P.hidden) die();
 }
 
+/* He is not a man. Built at man height he read as a big bloke in a mask;
+   at 1.18 he has to duck through his own doorways and his shoulders fill a
+   corridor, which is the entire point of him. The limp is a permanent record
+   of the bear trap - once the jaws have been through his boot he never walks
+   evenly again. */
+const V_SCALE = 1.18;
 function placeVillain(){
-  M4.trs(V.root, V.x, 0, V.z, 0, -V.ang + Math.PI/2, 0, 1, 1, 1);
+  let lurch = 0;
+  if (V.limp > 0){
+    // the bad leg drops him a little every time it takes his weight
+    lurch = -Math.abs(Math.sin(V.anim * (2.0 + V.speed * 1.6))) * 0.035 * V.limp;
+  }
+  M4.trs(V.root, V.x, lurch, V.z, 0, -V.ang + Math.PI/2, 0, V_SCALE, V_SCALE, V_SCALE);
   updateRig(V.bones, V.root);
 }
 
@@ -7304,6 +7685,7 @@ function cineEscape(onDone){
 
 let PROG = {}, quadVAO = null;
 let sceneRT = null, bloomA = null, bloomB = null, shadowRT = null;
+let bloomC = null, bloomD = null;      // the wide halation pair, quarter of the quarter
 let RW = 1, RH = 1;
 
 const mVP = M4.create(), mProj = M4.create(), mView = M4.create();
@@ -7346,6 +7728,8 @@ function resize(){
   sceneRT = makeTarget(w, h, true);
   bloomA = makeTarget(Math.max(2, w>>2), Math.max(2, h>>2), false);
   bloomB = makeTarget(Math.max(2, w>>2), Math.max(2, h>>2), false);
+  bloomC = makeTarget(Math.max(2, w>>4), Math.max(2, h>>4), false);
+  bloomD = makeTarget(Math.max(2, w>>4), Math.max(2, h>>4), false);
   const ss = shadowSize();
   if (ss && (!shadowRT || shadowRT.size !== ss)) shadowRT = makeShadowTarget(ss);
   if (!ss) shadowRT = null;
@@ -7398,8 +7782,81 @@ function eachDrawable(cb){
   }
 }
 
+/* ======================================================================
+   MATERIAL RESPONSE
+   ----------------------------------------------------------------------
+   Every surface in the house is a painted canvas, and until now the shader
+   treated all of them identically: one specular power, no relief, no light
+   bleeding through anything. That is why plaster, oxblood leather and a
+   forged blade all came back the same shade of flat.
+
+   Each entry is [relief, specular power, specular amount, subsurface]:
+     relief   - how hard the torch rakes across the painted height
+     power    - tight highlight (metal) vs broad sheen (plaster)
+     amount   - how much of it there is at all
+     subsurface - how far light wraps past the terminator and bleeds
+                  through: flesh and linen glow at the edges, iron does not
+   ====================================================================== */
+const MAT_DEFAULT = [0.85, 30, 0.12, 0.05];
+const MAT_CLASS = {
+  metalBright: [0.55, 96, 0.95, 0.00],
+  metalDull:   [0.90, 46, 0.34, 0.00],
+  flesh:       [0.75, 22, 0.17, 0.46],
+  leather:     [1.05, 26, 0.24, 0.07],
+  cloth:       [1.15, 13, 0.05, 0.32],
+  wood:        [0.90, 34, 0.15, 0.03],
+  plaster:     [1.05, 18, 0.05, 0.01],
+  glazed:      [0.35, 104, 0.70, 0.10],
+  paper:       [0.60, 16, 0.04, 0.30],
+  wax:         [0.50, 30, 0.14, 0.62],
+  ember:       [0.20, 12, 0.05, 0.00]
+};
+const MAT_OF = {
+  // his own kit
+  orcSkin:'flesh', fangIvory:'flesh', bone:'flesh', skin:'flesh', stubble:'flesh',
+  maskLeather:'leather', bootStone:'leather', redBoot:'leather', leatherPouch:'leather', boot:'leather',
+  wrapCloth:'cloth', tealTrouser:'cloth', sashRed:'cloth', tabard:'cloth', trouser:'cloth',
+  warBlade:'metalBright', blade:'metalBright', ironStud:'metalDull', plate:'metalDull',
+  emberEye:'ember',
+  // arms and tools
+  gunmetal:'metalBright', toolMetal:'metalBright', rawIron:'metalDull', trapIron:'metalDull',
+  safeIron:'metalDull', steel:'metalDull', rustIron:'metalDull', keypadFace:'glazed',
+  brass:'metalBright', brassStone:'metalBright', brassShell:'metalBright',
+  gunWood:'wood', rubberGrip:'leather', copperTin:'metalDull', tinRed:'metalDull',
+  // the house
+  wood:'wood', oakPanel:'wood', plankWood:'wood', floorTex:'wood', bloodBoard:'wood',
+  door:'wood', doorGreen:'wood', doorRed:'wood', doorBlue:'wood', doorWhite:'wood', doorBlack:'wood',
+  floorPaleBoard:'wood', floorDarkBoard:'wood',
+  concrete:'plaster', brick:'plaster', sootStone:'plaster', marble:'glazed', ceil:'plaster',
+  panel:'plaster', wallpaper:'plaster', wallpaperFloral:'plaster',
+  tile:'glazed', porcelain:'glazed', chinaGlaze:'glazed', mirrorGlass:'glazed',
+  glass:'glazed', greenBottle:'glazed', bulb:'glazed', floorCheckTile:'glazed', floorBlueLino:'glazed',
+  paper:'paper', oilPaint:'paper', waxCandle:'wax',
+  velvet:'cloth', velvetGreen:'cloth', carpet:'cloth', curtain:'cloth', coat:'cloth',
+  quiltCloth:'cloth', linenSheet:'cloth', dustSheet:'cloth', sackCloth:'cloth', shirt:'cloth',
+  hair:'cloth', floorGreenCarpet:'cloth', floorRedCarpet:'cloth',
+  eye:'glazed', iris:'glazed', pupil:'glazed', lip:'flesh'
+};
+const MAT_CACHE = Object.create(null);
+function matParams(tex){
+  let m = MAT_CACHE[tex];
+  if (m) return m;
+  let cls = MAT_OF[tex];
+  if (!cls){
+    // the wall/floor palette is generated by name, so match on the stem
+    if (/^wall/.test(tex)) cls = 'plaster';
+    else if (/^floor/.test(tex)) cls = 'wood';
+    else if (/^door/.test(tex)) cls = 'wood';
+    else if (/Iron|Steel|Metal|metal/.test(tex)) cls = 'metalDull';
+    else if (/Cloth|cloth|Sheet|Quilt/.test(tex)) cls = 'cloth';
+  }
+  m = MAT_CACHE[tex] = MAT_CLASS[cls] || MAT_DEFAULT;
+  return m;
+}
+
 function drawScene(prog, depthOnly){
   let lastTex = null;
+  const hasMat = !depthOnly && prog.u.uMat !== undefined && prog.u.uMat !== null;
   eachDrawable((mesh, model, tex, glow) => {
     gl.uniformMatrix4fv(prog.u.uModel, false, model);
     if (!depthOnly){
@@ -7407,12 +7864,17 @@ function drawScene(prog, depthOnly){
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, TX[tex] || TX.concrete);
         lastTex = tex;
+        if (hasMat){
+          const m = matParams(tex);
+          gl.uniform4f(prog.u.uMat, m[0] * MAT_RELIEF, m[1], m[2], m[3]);
+        }
       }
       gl.uniform1f(prog.u.uGlow, glow || 0);
     }
     drawMesh(mesh);
   });
 }
+let MAT_RELIEF = 1;
 
 /* ---------------- one frame ---------------- */
 function renderFrame(dt){
@@ -7452,9 +7914,15 @@ function renderFrame(dt){
     gl.viewport(0, 0, shadowRT.size, shadowRT.size);
     gl.clear(gl.DEPTH_BUFFER_BIT);
     gl.cullFace(gl.FRONT);
+    /* Slope-scaled depth offset on the caster side as well. Between this and
+       the normal offset on the receiver, nothing in the house shadows itself
+       - and the Lodger stops being a lit body with holes cut in it. */
+    gl.enable(gl.POLYGON_OFFSET_FILL);
+    gl.polygonOffset(2.2, 4.0);
     gl.useProgram(PROG.depth.p);
     gl.uniformMatrix4fv(PROG.depth.u.uVP, false, mLightVP);
     drawScene(PROG.depth, true);
+    gl.disable(gl.POLYGON_OFFSET_FILL);
     gl.cullFace(gl.BACK);
   } else {
     M4.ident(mLightVP);
@@ -7474,13 +7942,30 @@ function renderFrame(dt){
   gl.uniform3fv(m.u.uFlashPos, torchPos);
   gl.uniform3fv(m.u.uFlashDir, dir);
   gl.uniform4f(m.u.uFlashParams, 0.96, 0.52, 16.0, torchInt);
-  const amb = P.powerOn ? 0.17 : 0.10;
+  /* The frame is exposed up into the film curve now, so the old ambient
+     values read as daylight. The house is meant to be black past the torch. */
+  const amb = P.powerOn ? 0.088 : 0.048;
   gl.uniform3f(m.u.uAmbient, amb*0.92, amb*0.97, amb*1.18);
   gl.uniform3f(m.u.uFogColor, 0.012, 0.013, 0.017);
   gl.uniform1f(m.u.uFogDensity, P.powerOn ? 0.020 : 0.030);
   gl.uniform3f(m.u.uTint, 1, 1, 1);
   gl.uniform1f(m.u.uShadowOn, useShadow ? 1 : 0);
   gl.uniform1f(m.u.uShadowTexel, useShadow ? 1/shadowRT.size : 0);
+  gl.uniform1f(m.u.uTimeS, performance.now()/1000);
+  MAT_RELIEF = q.relief === undefined ? 1 : q.relief;
+  // the beam only exists where there is a shadow map to march against
+  gl.uniform2f(m.u.uVol, useShadow ? (q.vol || 0) : 0, 0.055);
+  // his eyes carry their own light, and they get brighter the angrier he is
+  if (V.active && V.bones && V.bones.head){
+    const hp = headPos();
+    /* Two coals in burnt sockets, not a lamp. It should just barely stain
+       whatever his face is close to - the underside of a doorframe, your
+       own hands. Anything stronger and he lights the room for you. */
+    const ember = 0.13 + (V.rage || 0) * 0.10 + (V.state === 'hunt' || V.state === 'lunge' ? 0.10 : 0);
+    gl.uniform4f(m.u.uEmber, hp[0], hp[1] + 0.04, hp[2], ember * (V.stun > 0 ? 0.3 : 1));
+  } else {
+    gl.uniform4f(m.u.uEmber, 0, -99, 0, 0);
+  }
   gl.uniform1i(m.u.uTex, 0);
   gl.uniform1i(m.u.uShadow, 1);
   if (useShadow){
@@ -7518,6 +8003,7 @@ function renderFrame(dt){
     gl.useProgram(PROG.bright.p);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, sceneRT.col);
     gl.uniform1i(PROG.bright.u.uTex, 0);
+    gl.uniform2f(PROG.bright.u.uTexel, 1/RW, 1/RH);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
     gl.useProgram(PROG.blur.p);
@@ -7531,6 +8017,30 @@ function renderFrame(dt){
     gl.bindTexture(gl.TEXTURE_2D, bloomB.col);
     gl.uniform2f(PROG.blur.u.uDir, 0, 1/bloomA.h);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+    /* the wide pass: take the tight bloom down another two mips and smear it
+       hard, which is what gives a bulb its halo and a muzzle flash its bloom
+       across the whole room instead of a neat little disc */
+    gl.bindFramebuffer(gl.FRAMEBUFFER, bloomD.fbo);
+    gl.viewport(0, 0, bloomD.w, bloomD.h);
+    gl.bindTexture(gl.TEXTURE_2D, bloomA.col);
+    gl.uniform2f(PROG.blur.u.uDir, 2.6/bloomD.w, 0);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, bloomC.fbo);
+    gl.bindTexture(gl.TEXTURE_2D, bloomD.col);
+    gl.uniform2f(PROG.blur.u.uDir, 0, 2.6/bloomC.h);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, bloomD.fbo);
+    gl.bindTexture(gl.TEXTURE_2D, bloomC.col);
+    gl.uniform2f(PROG.blur.u.uDir, 5.1/bloomD.w, 0);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, bloomC.fbo);
+    gl.bindTexture(gl.TEXTURE_2D, bloomD.col);
+    gl.uniform2f(PROG.blur.u.uDir, 0, 5.1/bloomC.h);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     gl.enable(gl.DEPTH_TEST);
   }
 
@@ -7543,17 +8053,24 @@ function renderFrame(dt){
   gl.useProgram(po.p);
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, sceneRT.col);
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, bloomOn ? bloomA.col : sceneRT.col);
+  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, bloomOn ? bloomC.col : sceneRT.col);
   gl.uniform1i(po.u.uScene, 0);
   gl.uniform1i(po.u.uBloom, 1);
+  gl.uniform1i(po.u.uBloomWide, 2);
   gl.uniform1f(po.u.uTime, performance.now()/1000);
   gl.uniform1f(po.u.uGrain, q.grain);
   gl.uniform1f(po.u.uBright, S.bright * 1.22);
   gl.uniform1f(po.u.uCA, q.ca);
   gl.uniform1f(po.u.uVig, 0.92);
   gl.uniform1f(po.u.uFear, P.fear);
-  gl.uniform1f(po.u.uBloomAmt, bloomOn ? 0.55 : 0);
+  gl.uniform1f(po.u.uBloomAmt, bloomOn ? 0.42 : 0);
   gl.uniform1f(po.u.uFlash, flashAmt);
+  // pulse, blood, breath, lens grime
+  gl.uniform4f(po.u.uState, P.beat || 0, P.wound || 0, P.breathFog || 0, (q.dirt || 0) * 0.05);
+  // hiding letterbox, and the fade the house pulls down over you
+  gl.uniform3f(po.u.uState2, P.hidden ? 1 : 0, 0, P.fadeOut || 0);
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  gl.activeTexture(gl.TEXTURE0);
   gl.enable(gl.DEPTH_TEST);
   gl.bindVertexArray(null);
 }
