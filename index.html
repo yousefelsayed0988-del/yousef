@@ -7332,17 +7332,22 @@ function restWorld(bones, name){
 /* Which bones get remade as field, and how finely. Hands, feet and every
    piece of kit stay as they are - they are hard-surface, they have no seam
    problem, and melting a boot into a shin would help nobody. */
+/* `shrink` erodes the field by that many metres before it is meshed. A
+   smooth minimum ADDS volume - it fills the concavity between two forms
+   rather than cutting it - so flesh that was inside a trouser leg or a
+   linen wrap when it was a plain tube grows straight out through the cloth
+   once it is blended. Anywhere he is dressed, the skin is pulled back in. */
 const SDF_BONES = {
-  head:      { vox: 0.0052, pad: 0.055 },
-  neck:      { vox: 0.0070, pad: 0.060 },
-  chest:     { vox: 0.0080, pad: 0.070 },
-  spine:     { vox: 0.0080, pad: 0.070 },
-  pelvis:    { vox: 0.0085, pad: 0.060 },
-  shoulderL: { vox: 0.0068, pad: 0.055 }, shoulderR: { vox: 0.0068, pad: 0.055 },
-  upperArmL: { vox: 0.0068, pad: 0.055 }, upperArmR: { vox: 0.0068, pad: 0.055 },
-  foreArmL:  { vox: 0.0065, pad: 0.050 }, foreArmR:  { vox: 0.0065, pad: 0.050 },
-  thighL:    { vox: 0.0080, pad: 0.055 }, thighR:    { vox: 0.0080, pad: 0.055 },
-  shinL:     { vox: 0.0075, pad: 0.050 }, shinR:     { vox: 0.0075, pad: 0.050 }
+  head:      { vox: 0.0052, pad: 0.055, shrink: 0 },
+  neck:      { vox: 0.0070, pad: 0.060, shrink: 0 },
+  chest:     { vox: 0.0080, pad: 0.070, shrink: 0 },
+  spine:     { vox: 0.0080, pad: 0.070, shrink: 0 },
+  pelvis:    { vox: 0.0085, pad: 0.060, shrink: 0.018 },   // under the trousers
+  shoulderL: { vox: 0.0068, pad: 0.055, shrink: 0 }, shoulderR: { vox: 0.0068, pad: 0.055, shrink: 0 },
+  upperArmL: { vox: 0.0068, pad: 0.055, shrink: 0.002 }, upperArmR: { vox: 0.0068, pad: 0.055, shrink: 0.002 },
+  foreArmL:  { vox: 0.0065, pad: 0.050, shrink: 0.006 }, foreArmR:  { vox: 0.0065, pad: 0.050, shrink: 0.006 },
+  thighL:    { vox: 0.0080, pad: 0.055, shrink: 0.024 }, thighR:    { vox: 0.0080, pad: 0.055, shrink: 0.024 },
+  shinL:     { vox: 0.0075, pad: 0.050, shrink: 0.018 }, shinR:     { vox: 0.0075, pad: 0.050, shrink: 0.018 }
 };
 
 /* how far the forms blend into each other, in metres. Big enough that a
@@ -7437,6 +7442,7 @@ function buildSdfSkin(bones){
        minimum plus the blend radius cannot change the answer and never gets
        evaluated properly. That turns a full sweep of every form into a
        handful of real evaluations per point. */
+    const shrink = cfg.shrink || 0;
     const field = (x, y, z) => {
       let d = 1e9;
       for (let i = 0; i < NC; i++){
@@ -7445,7 +7451,7 @@ function buildSdfSkin(bones){
         if (lb > d + SDF_BLEND) continue;
         d = sdSmin(d, evalForm(near[i], x, y, z), SDF_BLEND);
       }
-      return d;
+      return d + shrink;
     };
 
     /* Voxel size follows the quality preset. Low keeps the old primitive
