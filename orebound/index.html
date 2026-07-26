@@ -153,6 +153,33 @@
   }
   .fluid-overlay { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .25s; mix-blend-mode: multiply; }
 
+  /* --------------------------------------------------------- multiplayer */
+  .nametags { position: absolute; inset: 0; pointer-events: none; }
+  .nametag {
+    position: absolute; transform: translate(-50%, -100%);
+    font-size: 12.5px; white-space: nowrap; color: #fff;
+    background: rgba(8,10,14,.62); border: 1px solid rgba(255,255,255,.14);
+    padding: 2px 8px; border-radius: 5px; text-shadow: 0 1px 2px #000;
+  }
+  .chat {
+    position: absolute; left: 12px; bottom: 108px; width: min(460px, 46vw);
+    opacity: 0; transition: opacity .3s; pointer-events: none;
+  }
+  .chat.active { opacity: 1; }
+  .chat.typing { pointer-events: auto; }
+  .chat-log {
+    max-height: 190px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px;
+    font-size: 13px; text-shadow: 0 1px 3px #000;
+  }
+  .chat-line { background: rgba(8,10,14,.5); padding: 3px 8px; border-radius: 4px; }
+  .chat-line.system { color: var(--faint); font-style: italic; }
+  .chat-name { color: var(--accent); font-weight: 600; }
+  .chat-input {
+    margin-top: 6px; width: 100%; font: inherit; font-size: 13.5px; color: var(--ink);
+    background: rgba(8,10,14,.9); border: 1px solid var(--slot-edge);
+    border-radius: 6px; padding: 8px 10px; pointer-events: auto;
+  }
+
   /* --------------------------------------------------------------- debug */
   .debug {
     position: absolute; left: 8px; top: 8px; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;

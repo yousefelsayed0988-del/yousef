@@ -83,6 +83,7 @@ export class Controls {
     const code = e.code;
     // let the browser handle typing in text fields
     if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT')) return;
+    if (this.game.ui && this.game.ui.chatOpen) return;
 
     if (down) {
       if (this.keys.has(code)) { this._syncState(); return; }
@@ -127,6 +128,7 @@ export class Controls {
     if (game.ui.isOpen) return;
 
     if (code === 'F3') { game.toggleDebug(); return; }
+    if (code === 'KeyT' && game.net) { game.ui.openChat(); return; }
     if (code === 'KeyQ') { game.dropHeld(e.shiftKey); return; }
     if (code.startsWith('Digit')) {
       const n = +code.slice(5);

@@ -8,11 +8,24 @@ import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
+import { networkInterfaces } from 'node:os';
+import { MultiplayerServer } from './mpserver.mjs';
 
 const ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)));
 const argPort = process.argv.slice(2).find(a => /^\d+$/.test(a));
 const PORT = Number(argPort || process.env.PORT || 8080);
 const OPEN = process.argv.includes('--open');
+const NO_MP = process.argv.includes('--no-multiplayer');
+const seedArg = process.argv.find(a => a.startsWith('--seed='));
+
+// The multiplayer authority shares this process and this port: one command
+// serves the game and hosts the shared world, so "play together" is not a
+// second thing to install and run.
+const mp = NO_MP ? null : new MultiplayerServer({
+  dir: ROOT,
+  seed: seedArg ? Number(seedArg.slice(7)) : undefined,
+  log: (m) => console.log('  [online] ' + m),
+});
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -25,6 +38,16 @@ const TYPES = {
   '.ico': 'image/x-icon',
   '.md': 'text/markdown; charset=utf-8',
 };
+
+/** First non-internal IPv4 address, for the "others can join at" line. */
+function lanAddress() {
+  for (const list of Object.values(networkInterfaces())) {
+    for (const ni of list || []) {
+      if (ni.family === 'IPv4' && !ni.internal) return ni.address;
+    }
+  }
+  return 'localhost';
+}
 
 const server = createServer(async (req, res) => {
   try {
@@ -77,8 +100,28 @@ function listen(port, attemptsLeft) {
   server.listen(port, () => {
     const url = `http://localhost:${port}/`;
     console.log(`\n  Orebound is running at ${url}`);
+    if (mp) {
+      const lan = lanAddress();
+      console.log('  Online play is on. Others on your network can join at:');
+      console.log(`    http://${lan}:${port}/`);
+    }
     console.log('  Leave this window open while you play. Press Ctrl+C to stop.\n');
     if (OPEN) openBrowser(url);
+  });
+}
+
+// WebSocket upgrades go to the multiplayer authority
+if (mp) {
+  server.on('upgrade', (req, socket) => {
+    if (new URL(req.url, 'http://localhost').pathname !== '/net') { socket.destroy(); return; }
+    mp.handleUpgrade(req, socket).catch(() => socket.destroy());
+  });
+}
+
+for (const sig of ['SIGINT', 'SIGTERM']) {
+  process.on(sig, async () => {
+    if (mp) await mp.close();
+    process.exit(0);
   });
 }
 

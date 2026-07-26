@@ -107,6 +107,25 @@ export class GameUI {
     this.cursorEl = el('div', 'cursor-stack', r);
     this.cursorEl.style.display = 'none';
 
+    this.nameTags = el('div', 'nametags', r);
+    this.tagPool = new Map();
+    this.chatBox = el('div', 'chat', r);
+    this.chatLog = el('div', 'chat-log', this.chatBox);
+    this.chatInput = el('input', 'chat-input', this.chatBox);
+    this.chatInput.type = 'text';
+    this.chatInput.maxLength = 200;
+    this.chatInput.placeholder = 'Say something...';
+    this.chatInput.style.display = 'none';
+    this.chatInput.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') {
+        const text = this.chatInput.value.trim();
+        this.chatInput.value = '';
+        this.closeChat();
+        if (text && this.game.net) this.game.net.sendChat(text);
+      } else if (e.key === 'Escape') { this.chatInput.value = ''; this.closeChat(); }
+    });
+
     this.vignette = el('div', 'vignette', r);
     this.damageFlash = el('div', 'damage-flash', r);
     this.fluidOverlay = el('div', 'fluid-overlay', r);
@@ -210,6 +229,66 @@ export class GameUI {
     this._chTimer = setTimeout(() => {
       c.style.transform = 'translate(-50%, -50%) scale(1)';
     }, 70);
+  }
+
+  // ------------------------------------------------------------ multiplayer
+  /** Float a name over every remote player, projected through the camera. */
+  updateNameTags(net, viewProj, cam) {
+    const seen = new Set();
+    const w = window.innerWidth, h = window.innerHeight;
+    const pos = [0, 0, 0];
+    for (const [id, r] of net.players) {
+      seen.add(id);
+      net.interpolate(r, pos);
+      const x = pos[0], y = pos[1] + 2.1, z = pos[2];
+      const cx = viewProj[0] * x + viewProj[4] * y + viewProj[8] * z + viewProj[12];
+      const cy = viewProj[1] * x + viewProj[5] * y + viewProj[9] * z + viewProj[13];
+      const cw = viewProj[3] * x + viewProj[7] * y + viewProj[11] * z + viewProj[15];
+      let tag = this.tagPool.get(id);
+      const dist = Math.hypot(x - cam[0], y - cam[1], z - cam[2]);
+      if (cw <= 0.01 || dist > 90) { if (tag) tag.style.display = 'none'; continue; }
+      if (!tag) { tag = el('div', 'nametag', this.nameTags); this.tagPool.set(id, tag); }
+      if (tag._name !== r.name) { tag._name = r.name; tag.textContent = r.name; }
+      tag.style.display = '';
+      tag.style.left = ((cx / cw) * 0.5 + 0.5) * w + 'px';
+      tag.style.top = (1 - ((cy / cw) * 0.5 + 0.5)) * h + 'px';
+      tag.style.opacity = Math.max(0.25, 1 - dist / 90);
+    }
+    for (const [id, tag] of this.tagPool) {
+      if (!seen.has(id)) { tag.remove(); this.tagPool.delete(id); }
+    }
+  }
+
+  pushChat(from, text) {
+    const line = el('div', 'chat-line', this.chatLog);
+    if (from) {
+      const n = el('span', 'chat-name', line);
+      n.textContent = from + ': ';
+    } else line.classList.add('system');
+    line.appendChild(document.createTextNode(text));
+    while (this.chatLog.childElementCount > 40) this.chatLog.firstChild.remove();
+    this.chatLog.scrollTop = this.chatLog.scrollHeight;
+    this.chatBox.classList.add('active');
+    clearTimeout(this._chatFade);
+    this._chatFade = setTimeout(() => {
+      if (!this.chatOpen) this.chatBox.classList.remove('active');
+    }, 8000);
+  }
+
+  openChat() {
+    if (!this.game.net) return;
+    this.chatOpen = true;
+    this.chatBox.classList.add('active', 'typing');
+    this.chatInput.style.display = '';
+    document.exitPointerLock();
+    setTimeout(() => this.chatInput.focus(), 20);
+  }
+
+  closeChat() {
+    this.chatOpen = false;
+    this.chatInput.style.display = 'none';
+    this.chatBox.classList.remove('typing');
+    if (this.game.started) this.game.controls.requestLock();
   }
 
   toast(msg, ms = 2600) {
@@ -696,6 +775,22 @@ export class GameUI {
       el('h1', null, p).textContent = 'Paused';
       const menu = el('div', 'menu-buttons', p);
       this._btn(menu, 'Back to Game', () => this.close());
+      el('div', 'sep', menu);
+      const nameRow = el('div', 'field', menu);
+      el('label', null, nameRow).textContent = 'Your name (online)';
+      const nameInput = el('input', null, nameRow);
+      nameInput.type = 'text';
+      nameInput.maxLength = 16;
+      nameInput.value = localStorage.getItem('orebound.name') || '';
+      nameInput.placeholder = 'e.g. Yousef';
+      this._btn(menu, 'Play Online (shared world)', () => {
+        const n = nameInput.value.trim() || 'Player';
+        try { localStorage.setItem('orebound.name', n); } catch { }
+        this.game.startOnline(n);
+      });
+      el('div', 'muted center small', menu).textContent =
+        'Everyone who opens this server\u2019s address joins the same world.';
+
       this._btn(menu, 'Controls & Help', () => this.openHelp());
       this._btn(menu, 'Settings', () => this.openSettings());
       this._btn(menu, 'Save Now', async () => {
@@ -728,6 +823,8 @@ export class GameUI {
         ['Drop item', 'Q'],
         ['Debug overlay', 'F3'],
         ['Pause', 'Esc'],
+        ['Chat (online only)', 'T'],
+        ['Dismount boat / horse', 'Left Shift'],
       ];
       for (const [a, b] of rows) {
         const tr = el('tr', null, table);
@@ -744,6 +841,9 @@ export class GameUI {
         'A bed skips the night and sets your respawn point, but only if no monsters are close.',
         'Smelt ore in a furnace with coal, charcoal, or planks as fuel.',
         'Water and lava meeting makes stone, cobblestone, or obsidian depending on which is flowing.',
+        'Tame a wolf with bones and a horse with apples. A tamed wolf follows you and fights what attacks you.',
+        'Villages have houses, farms and traders. Right-click a villager to trade -- emeralds are the currency.',
+        'Online: everyone who opens the server address joins the same world. Build together, press T to chat.',
       ]) el('li', null, tips).textContent = t;
       const menu = el('div', 'menu-buttons', p);
       this._btn(menu, 'Back', () => (this.game.started ? this.openPause() : this.openMainMenu()));
@@ -819,6 +919,22 @@ export class GameUI {
         saveSettings();
         this.game.startNewWorld(seedInput.value);
       }, saves.length ? '' : 'primary');
+      el('div', 'sep', menu);
+      const nameRow = el('div', 'field', menu);
+      el('label', null, nameRow).textContent = 'Your name (online)';
+      const nameInput = el('input', null, nameRow);
+      nameInput.type = 'text';
+      nameInput.maxLength = 16;
+      nameInput.value = localStorage.getItem('orebound.name') || '';
+      nameInput.placeholder = 'e.g. Yousef';
+      this._btn(menu, 'Play Online (shared world)', () => {
+        const n = nameInput.value.trim() || 'Player';
+        try { localStorage.setItem('orebound.name', n); } catch { }
+        this.game.startOnline(n);
+      });
+      el('div', 'muted center small', menu).textContent =
+        'Everyone who opens this server\u2019s address joins the same world.';
+
       this._btn(menu, 'Controls & Help', () => this.openHelp());
       this._btn(menu, 'Settings', () => this.openSettings());
       if (saves.length > 0) {

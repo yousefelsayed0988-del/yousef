@@ -286,6 +286,30 @@ export function drawMob(renderer, mob, pos, light) {
   }
 }
 
+/** Another player, drawn from the same box vocabulary as the mobs. */
+export function drawRemotePlayer(renderer, r, pos, light, walking) {
+  const scale = 1;
+  const swing = walking ? Math.sin(performance.now() * 0.008) * 2.4 : 0;
+  const crouch = r.sneak ? -2 : 0;
+  const box = (x0, y0, z0, x1, y1, z1, color, dz = 0) => renderer.pushBox(
+    pos[0] + x0 * P, pos[1] + (y0 + crouch) * P, pos[2] + (z0 + dz) * P,
+    pos[0] + x1 * P, pos[1] + (y1 + crouch) * P, pos[2] + (z1 + dz) * P,
+    color, light, r.yaw, pos[0], pos[2]);
+  box(-4, 24, -4, 4, 32, 4, 0xc99b6d);            // head
+  box(-4, 12, -2, 4, 24, 2, 0x3f7ac0);            // torso
+  box(-4, 0, -2, -1, 12, 2, 0x2f3f6a, swing);     // legs
+  box(1, 0, -2, 4, 12, 2, 0x2f3f6a, -swing);
+  box(-8, 12, -2, -4, 22, 2, 0xc99b6d, -swing);   // arms
+  box(4, 12, -2, 8, 22, 2, 0xc99b6d, swing);
+  // eyes, so you can tell which way someone is facing at a distance
+  renderer.pushBox(pos[0] - 2.6 * P, pos[1] + (28 + crouch) * P, pos[2] - 4.3 * P,
+    pos[0] - 1.2 * P, pos[1] + (29.4 + crouch) * P, pos[2] - 3.9 * P,
+    0x25262e, Math.min(1, light + 0.3), r.yaw, pos[0], pos[2]);
+  renderer.pushBox(pos[0] + 1.2 * P, pos[1] + (28 + crouch) * P, pos[2] - 4.3 * P,
+    pos[0] + 2.6 * P, pos[1] + (29.4 + crouch) * P, pos[2] - 3.9 * P,
+    0x25262e, Math.min(1, light + 0.3), r.yaw, pos[0], pos[2]);
+}
+
 export function drawItemEntity(renderer, e, pos, light, color) {
   const spin = (e.age * 0.045) % (Math.PI * 2);
   const bob = Math.sin(e.age * 0.09) * 0.045;

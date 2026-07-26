@@ -12,3 +12,7 @@ _run_*.js
 
 # build artefacts: the game zip is generated from orebound/, which is tracked
 *.zip
+
+# the shared multiplayer world, written at runtime by the host
+world-online.json
+world-online.json.tmp

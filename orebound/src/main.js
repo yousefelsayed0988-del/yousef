@@ -9,7 +9,7 @@ import { BLOCKS, blockId, AIR, blockByName } from './core/blocks.js';
 import { ITEMS, item, itemByName } from './core/items.js';
 import { parseSeed, Random } from './core/rng.js';
 import { buildAtlas, buildMeshTables, itemIconURL } from './render/textures.js';
-import { averageTileColor, drawMob, drawItemEntity, drawArrow, drawFallingBlock, drawBoat, drawTNT } from './render/entitymodels.js';
+import { averageTileColor, drawMob, drawItemEntity, drawArrow, drawFallingBlock, drawBoat, drawTNT, drawRemotePlayer } from './render/entitymodels.js';
 import { Renderer } from './render/renderer.js';
 import { ViewModel } from './render/viewmodel.js';
 import { World } from './world/world.js';
@@ -23,6 +23,8 @@ import { MobSpawner, tickSpawnerBlocks, populateVillages } from './entities/spaw
 import { GameUI } from './ui/ui.js';
 import { Audio } from './audio/audio.js';
 import { SaveManager } from './save/save.js';
+import { NetClient } from './net/client.js';
+import { chunkKey as chunkKeyOf } from './world/chunk.js';
 import { mkStack } from './items/inventory.js';
 import { smeltResult, fuelTicks } from './core/recipes.js';
 import { mixColor } from './world/biomes.js';
@@ -57,11 +59,13 @@ class Game {
     this.itemColors = new Map();
     this._precomputeItemColors();
     this.viewModel = new ViewModel(this);
+    this.net = null;
+    this.online = false;
 
     window.addEventListener('resize', () => this.renderer.resize());
     this.renderer.resize();
     window.addEventListener('beforeunload', () => {
-      if (this.started) { try { this.save.serialize(); } catch { } }
+      if (this.started && !this.online) { try { this.save.serialize(); } catch { } }
     });
   }
 
@@ -117,6 +121,64 @@ class Game {
     this._finishStart();
   }
 
+  /**
+   * Join the shared world hosted by whichever server delivered this page.
+   * The server hands back the seed and its block-edit log; terrain is
+   * regenerated locally, so only edits cross the wire.
+   */
+  async startOnline(name) {
+    this.ui.openLoading('Connecting to the server...');
+    const net = new NetClient(this);
+    let hello;
+    try {
+      hello = await net.connect(name);
+    } catch (e) {
+      this.ui.toast('Could not join: ' + e.message);
+      return this.showMainMenu();
+    }
+    this.net = net;
+    this.online = true;
+    this.playerName = name;
+
+    this.ui.setLoading(0.15, 'Generating the shared world...');
+    await this._createWorld(hello.seed);
+    this.world.time = hello.time || 0;
+    if (hello.weather) {
+      this.world.weather.type = hello.weather.type;
+      this.world.weather.target = hello.weather.type === 'clear' ? 0 : 1;
+      this.world.weather.intensity = hello.weather.intensity || 0;
+    }
+    // replay the server's edit log through the save layer, so edits land even
+    // in chunks that have not been generated yet
+    for (const [key, [id, state]] of hello.edits) {
+      const [x, y, z] = key.split(',').map(Number);
+      this.applyRemoteEdit(x, y, z, id, state);
+    }
+
+    const spawn = this.world.gen.findSpawn();
+    this.player.x = spawn.x; this.player.y = spawn.y + 1; this.player.z = spawn.z;
+    this.player.px = this.player.x; this.player.py = this.player.y; this.player.pz = this.player.z;
+    this.player.spawn = { x: spawn.x, y: spawn.y + 1, z: spawn.z };
+    await this._waitForSpawnChunks();
+    net.flushPending();
+    this._finishStart();
+    this.ui.toast(`Joined as ${name}. Press T to chat.`, 5000);
+  }
+
+  /** Stage a server edit into the save layer so it survives chunk loading. */
+  applyRemoteEdit(x, y, z, id, state) {
+    const cx = x >> 4, cz = z >> 4;
+    const key = chunkKeyOf(cx, cz);
+    let rec = this.save.stored.get(key);
+    if (!rec) { rec = { diff: new Map(), blockEntities: [] }; this.save.stored.set(key, rec); }
+    rec.diff.set(((y + 64) << 8) | ((z & 15) << 4) | (x & 15), (id << 8) | (state & 255));
+    if (this.world.isLoaded(cx, cz)) {
+      this.net.suppress = true;
+      this.world.setBlock(x, y, z, id, state, { record: true });
+      this.net.suppress = false;
+    }
+  }
+
   async startFromSave(slot) {
     this.ui.openLoading('Loading world...');
     this.save.slot = slot;
@@ -131,13 +193,17 @@ class Game {
     }
     if (!parsed) return this.startNewWorld('');
     await this._createWorld(parsed.seed);
-    this.save.restore(parsed);
+    this.save.restore(parsed);   // repopulates the deltas cleared above
     await this._waitForSpawnChunks();
     this._finishStart();
   }
 
   async _createWorld(seed) {
     if (this.world) this.world.dispose();
+    // The save manager outlives individual worlds. Without this, the chunk
+    // deltas staged for world A replay into world B the moment its chunks
+    // load -- your old builds appearing in a brand new seed.
+    this.save.stored.clear();
     this.world = new World(seed, {
       renderer: this.renderer,
       onChunkReady: (c) => this.save.applyToChunk(c),
@@ -201,6 +267,8 @@ class Game {
 
   quitToMenu() {
     this.started = false;
+    if (this.net) { this.net.disconnect(); this.net = null; }
+    this.online = false;
     document.exitPointerLock();
     this.showMainMenu();
   }
@@ -272,13 +340,16 @@ class Game {
     this.ticker.tick(p.x, p.z);
     this.tickFurnaces();
     this.tickWeather();
-    this.spawner.tick(p);
+    if (!this.online) this.spawner.tick(p);
+    if (this.net) this.net.tick();
     if (w.time % 4 === 0) tickSpawnerBlocks(w, p);
     if (w.time % 40 === 0) populateVillages(w, p);
     this.tickParticles();
 
     if (this.save.lastSave === 0) this.save.lastSave = performance.now();
-    if (performance.now() - this.save.lastSave > CONFIG.autosaveMinutes * 60000) {
+    // online worlds live on the server; autosaving them into the local
+    // single-player slot would overwrite the player's own world
+    if (!this.online && performance.now() - this.save.lastSave > CONFIG.autosaveMinutes * 60000) {
       this.save.lastSave = performance.now();
       this.save.save().then(ok => { if (ok) this.ui.toast('Autosaved'); });
     }
@@ -780,6 +851,16 @@ class Game {
         drawFallingBlock(r, e, pos, light, averageTileColor(this.atlas.tiles.get(key)));
       } else drawMob(r, e, pos, light);
     }
+    if (this.net && this.net.connected) {
+      for (const rp of this.net.players.values()) {
+        this.net.interpolate(rp, pos);
+        const dx = pos[0] - this.camPos[0], dz = pos[2] - this.camPos[2];
+        if (dx * dx + dz * dz > (CONFIG.renderDistance * 16) ** 2) continue;
+        const light = this.lightAt(pos[0], pos[1] + 1, pos[2], env.dayLight);
+        const walking = Math.hypot(rp.x - rp.px, rp.z - rp.pz) > 0.02;
+        drawRemotePlayer(r, rp, pos, light, walking);
+      }
+    }
     for (const pt of this.particles) {
       const light = this.lightAt(pt.x, pt.y, pt.z, env.dayLight);
       r.pushBox(pt.x - pt.size, pt.y - pt.size, pt.z - pt.size,
@@ -811,6 +892,8 @@ class Game {
     // the hand goes last, on a cleared depth buffer
     if (!this.ui.isOpen) this.viewModel.draw(r, this.camPos, p.yaw, p.pitch, env, alpha);
 
+    if (this.net && this.net.connected) this.ui.updateNameTags(this.net, this.viewProjOf(), this.camPos);
+
     this.ui.fluidOverlay.style.opacity = this.underwater ? 0.42 : (this.inLavaView ? 0.85 : 0);
     this.ui.fluidOverlay.style.background = this.inLavaView ? '#c8400a' : '#2b5ea8';
   }
@@ -839,6 +922,8 @@ class Game {
         snow ? 0xf0f6ff : 0x8fa8d8, 0.85, 0, 0, 0);
     }
   }
+
+  viewProjOf() { return this.renderer.viewProj; }
 
   lightAt(x, y, z, dayLight) {
     const w = this.world;

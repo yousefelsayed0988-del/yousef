@@ -5,7 +5,8 @@ from wooden tools to diamond while managing hunger, saturation, and whatever
 comes out of the dark.
 
 Survival only — no creative mode, no flying, no free blocks. One persistent
-world, single player, no networking.
+world. Play alone, or share it: the server that ships the page also hosts a
+world your friends can join.
 
 ## Running it
 
@@ -13,8 +14,12 @@ world, single player, no networking.
 **macOS / Linux:** run **`./play.sh`**.
 
 Either one starts a small local server and opens the game in your browser.
-Nothing is installed and nothing goes over the internet. Leave the console
-window open while you play; closing it stops the server.
+Nothing is installed. Leave the console window open while you play; closing it
+stops the server.
+
+**To play together**, the same window prints a second address, like
+`http://192.168.1.24:8080/`. Anyone on your network who opens it lands in the
+same world — see [Online play](#online-play).
 
 Or by hand, from inside the `orebound` folder:
 
@@ -75,6 +80,8 @@ The spec suggested Three.js. I went lower-level on purpose:
 | Drop item | Q |
 | Debug overlay | F3 |
 | Pause | Esc |
+| Chat (online) | T |
+| Dismount boat / horse | Left Shift |
 
 Also in-game under **Pause → Controls & Help**.
 
@@ -205,6 +212,42 @@ Persisted: seed, time, weather, difficulty, chunk deltas, block entities (chest
 contents, **furnace input/fuel/output/progress/remaining burn**, sign text,
 spawner type), dropped items, mobs, boats, player state, and spawn point.
 
+### Online play
+
+The server that ships the page is also the multiplayer authority. One command
+serves the game *and* hosts the shared world, so playing together is not a
+second thing to install.
+
+The WebSocket implementation is ~150 lines in `mpserver.mjs` — the handshake is
+a SHA-1 and the frame codec handles masking and fragmentation. That is cheaper
+than taking a dependency on `ws` for a project that otherwise installs nothing.
+
+**Terrain is never sent.** The server owns the seed; every client regenerates
+identical terrain from it. What crosses the wire is the *edit log* — the blocks
+players have actually changed — so bandwidth is proportional to what you build,
+not to how far you explore. A late joiner receives the accumulated log and
+replays it through the same save layer that restores a single-player world, so
+edits land correctly even in chunks that have not been generated yet.
+
+The server is authoritative over the seed, the edit log, and the world clock
+(so night falls for everyone at once). It persists the shared world to
+`world-online.json` with the same temp-then-rename discipline as the
+single-player save.
+
+Players see each other, with interpolated movement between 10 Hz position
+snapshots, floating name tags, and chat on **T**.
+
+**The v1 boundary, stated plainly:** mobs, dropped items, and physics are
+simulated locally by each client. You and a friend both see zombies, but not
+the *same* zombies, and killing one does not remove it from their screen.
+Blocks, players, chat, time and weather are shared; entities are not. Making
+entities authoritative means moving the whole simulation server-side, which is
+a different architecture rather than an increment on this one.
+
+Over the internet rather than a LAN, the host needs to forward the port or use
+a tunnel; nothing in the game assumes a local network, but nothing sets that up
+for you either.
+
 ### Data-driven registries
 
 Blocks, items, recipes, tags, biomes, and loot tables are data. Adding content
@@ -254,13 +297,35 @@ melon and pumpkin stems that fruit onto adjacent blocks, bone meal, saplings
 growing into full trees, leaf decay, cane and cactus growth, grass spread, fire
 spread and rain extinguishing.
 
-**Mobs** — cow, pig, sheep, chicken (breedable, shearable, milkable) and
-zombie, skeleton, creeper, spider. Light-based spawn rules (light ≤ 7), category
-caps, daylight burning, thunderstorm surface spawns, despawning. Melee with
-i-frames and knockback, charged bow with ballistic arrows, shields, creeper
-explosions that damage terrain.
+**Mobs** — cow, pig, sheep, chicken (breedable, shearable, milkable), plus
+rabbits that hop and bolt, wolves you tame with bones that then follow, sit and
+defend you, foxes that hunt chickens and rabbits, rideable horses tamed with
+apples, squid drifting in open water, and bats flapping around dark caves.
+Hostiles: zombie, skeleton, creeper, spider — light-based spawn rules
+(light ≤ 7), category caps, daylight burning, thunderstorm surface spawns,
+despawning. Melee with i-frames and knockback, charged bow with ballistic
+arrows, shields, creeper explosions that damage terrain.
 
-**Also** — rideable boats, TNT you can light with flint and steel (and that
+**Villages** — generated on ground checked for slope: a well, houses on levelled
+pads with doors, windows, a crafting table, a furnace and a loot chest, tilled
+fields, and lamp posts. Each house registers a resident that becomes a villager.
+Villagers flee hostiles, zombies hunt them, and right-clicking one opens a trade
+screen driven by a per-profession offer table with limited uses. Robe colour
+reads the profession.
+
+**Breaking feedback** — the ten crack stages are one branching fracture
+generated up front with each pixel tagged by the stage it appears at, so the
+animation is strictly additive rather than re-randomised per frame. Chips fly
+off the struck face, the overlay swells and shudders as the block nears failure,
+the dig pitch rises, the crosshair kicks, and the camera shakes.
+
+**First-person hand** — a real view model, positioned along the camera basis and
+drawn on a cleared depth buffer so it never clips through walls. Block items
+render as a genuine textured cube through the terrain shader; tools render as
+shaped box assemblies. Swinging, mining, eating, drawing a bow and raising a
+shield all drive it.
+
+**Also** — shared-world online play, rideable boats, TNT you can light with flint and steel (and that
 chain-detonates), editable signs, item drops that merge and despawn, falling
 sand and gravel, fluid flow with the full water/lava interaction rules and
 infinite water sources, procedural audio, autosave.
@@ -280,6 +345,8 @@ Not done, and worth naming rather than hiding:
 - **Sign text is not rendered on the sign in 3D.** It is stored, saved, and
   shown as a readout when you look at the sign.
 - **Mineshafts have no rails**, since rails are redstone-adjacent and deferred.
+- **Online mobs are client-local** — see [Online play](#online-play) for exactly
+  what is and is not shared.
 
 ## One deliberate deviation
 
@@ -315,6 +382,8 @@ node orebound/tools/smoke.mjs             # boot + 34 correctness checks
 node orebound/tools/soak.mjs              # 48 checks: long walk, fluids, farming,
                                           #   night, combat, death, save/load,
                                           #   explosions, boats, TNT, world limits
+node orebound/tools/multiplayer.mjs       # two real browsers join one server and
+                                          #   must agree on the world
 node orebound/tools/scenes.mjs ./shots    # screenshots of world + every UI screen
 node orebound/tools/worldgen-report.mjs   # offline terrain/ore/cave statistics
 ```
@@ -330,14 +399,16 @@ instead — the part the engine is responsible for.
 ```
 orebound/
   index.html            canvas, HUD styling, screen layout
-  serve.mjs             dependency-free static server
+  serve.mjs             dependency-free static server + multiplayer host
+  mpserver.mjs          minimal WebSocket server and shared-world authority
   src/
     core/               config, RNG, noise, math, registries (blocks, items,
                         tags, recipes, loot)
     world/              chunk storage, world manager, generation, biomes,
                         structures, lighting, fluids, random ticks
     render/             WebGL2 renderer, sub-chunk mesher, block models,
-                        procedural textures, entity models
+                        procedural textures, entity + view models
+    net/                multiplayer client
     player/             physics (swept AABB + raycast), player, input
     entities/           mobs, items, arrows, boats, TNT, spawning
     items/              inventory, containers, crafting grid

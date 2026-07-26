@@ -228,6 +228,11 @@ export class World {
       this.notifyNeighbours(x, y, z);
       this.scheduleFluidAround(x, y, z);
     }
+    // in online play every recorded edit is mirrored to the server, which
+    // owns the authoritative edit log and relays it to the other players
+    if (opts.record !== false && this.game && this.game.net) {
+      this.game.net.reportEdit(x, y, z, id, state);
+    }
     return true;
   }
 
