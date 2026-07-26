@@ -7,12 +7,26 @@ comes out of the dark.
 Survival only — no creative mode, no flying, no free blocks. One persistent
 world, single player, no networking.
 
+## Running it
+
+**Windows:** double-click **`PLAY OREBOUND.bat`**.
+**macOS / Linux:** run **`./play.sh`**.
+
+Either one starts a small local server and opens the game in your browser.
+Nothing is installed and nothing goes over the internet. Leave the console
+window open while you play; closing it stops the server.
+
+Or by hand, from inside the `orebound` folder:
+
 ```bash
-node orebound/serve.mjs        # then open http://localhost:8080/
+node serve.mjs --open           # or: python3 -m http.server 8080
 ```
 
-It must be served over `http://`. ES-module workers and `import` do not work
-from `file://`.
+> **Do not open `index.html` by double-clicking it.** The game is built from
+> JavaScript modules and runs terrain generation on worker threads, and browsers
+> block both over `file://` — you get a black "loading orebound" screen and
+> nothing else. The launchers exist precisely to avoid that. If you do open it
+> from disk, the page now tells you so instead of hanging.
 
 Requires WebGL2 and module workers: Chrome 91+, Firefox 114+, Safari 16.4+.
 

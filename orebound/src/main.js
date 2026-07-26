@@ -851,15 +851,28 @@ function rayAABB(ox, oy, oz, dx, dy, dz, x0, y0, z0, x1, y1, z1) {
 }
 
 // ------------------------------------------------------------------- boot
-const game = new Game();
-window.game = game;
-game.boot().catch(err => {
+//
+// Construction has to be inside the guard too: `new Game()` builds the GL
+// context and the texture atlas, and a throw there used to escape as an
+// uncaught module error, leaving the loading screen up with no explanation.
+function fail(err) {
   console.error(err);
-  document.body.innerHTML = `<div style="color:#e8e8e8;font:14px system-ui;padding:40px;white-space:pre-wrap">
-Orebound failed to start.
+  const detail = err && err.stack ? err.stack : String(err);
+  const show = window.__oreboundFail;
+  if (show) {
+    show('Orebound failed to start',
+      '<p>Something went wrong while starting the game. The details below say what.</p>' +
+      '<p>Orebound needs WebGL2 and module workers: Chrome 91+, Firefox 114+, or Safari 16.4+.</p>',
+      detail);
+  } else {
+    document.body.textContent = 'Orebound failed to start: ' + detail;
+  }
+}
 
-${err && err.stack ? err.stack : err}
-
-This game needs WebGL2 and ES module workers (Chrome 91+, Firefox 114+, Safari 16.4+).
-It must be served over http:// -- opening index.html directly from disk will not work.</div>`;
-});
+try {
+  const game = new Game();
+  window.game = game;
+  game.boot().then(() => { window.__oreboundBooted = true; }).catch(fail);
+} catch (err) {
+  fail(err);
+}

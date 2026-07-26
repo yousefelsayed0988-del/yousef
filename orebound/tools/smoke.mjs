@@ -74,7 +74,12 @@ await page.evaluate(() => {
 });
 await page.waitForTimeout(SECONDS * 500);
 await page.evaluate(() => { window.game.controls.keys.clear(); });
-await page.waitForTimeout(700);
+// let the player actually come to rest before sampling -- sampling mid-jump or
+// mid-fall makes the "supported" assertion flaky for no good reason
+await page.waitForFunction(
+  () => { const p = window.game.player; return p.onGround || p.inWater || p.inLava; },
+  null, { timeout: 15000 }).catch(() => { });
+await page.waitForTimeout(400);
 
 const report = await page.evaluate(() => {
   const g = window.game;
@@ -124,7 +129,7 @@ check('chunks loaded', report.chunks > 40, `${report.chunks}`);
 check('sub-chunk meshes built', report.meshes > 30, `${report.meshes}`);
 check('terrain is being drawn', report.sectionsDrawn > 5, `${report.sectionsDrawn} sections`);
 check('triangles > 0', report.triangles > 1000, `${report.triangles}`);
-check('player supported (ground or fluid)', report.onGround === true || report.inFluid === true,
+check('player comes to rest on ground or in fluid', report.onGround === true || report.inFluid === true,
   `onGround=${report.onGround} inFluid=${report.inFluid}`);
 check('player above bedrock', report.player.y > -60, `y=${report.player.y.toFixed(1)}`);
 check('player at/near surface', Math.abs(report.player.y - report.topSolid) < 6,

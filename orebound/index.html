@@ -37,6 +37,28 @@
     background: #05070c; color: var(--dim); font-size: 13px; letter-spacing: .3em;
     text-transform: uppercase;
   }
+  #boot.failed { place-items: center; padding: 24px; overflow-y: auto; }
+  .boot-panel {
+    max-width: 560px; text-align: left; text-transform: none; letter-spacing: normal;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 26px 30px; box-shadow: 0 24px 70px rgba(0,0,0,.6);
+  }
+  .boot-panel h1 {
+    margin: 0 0 14px; font-size: 20px; font-weight: 650; color: var(--ink); letter-spacing: .01em;
+  }
+  .boot-body { color: var(--dim); font-size: 14px; line-height: 1.65; }
+  .boot-body p { margin: 0 0 11px; }
+  .boot-body code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px;
+    background: rgba(255,255,255,.08); border: 1px solid var(--slot-edge);
+    border-radius: 4px; padding: 2px 6px; color: var(--ink);
+  }
+  .boot-detail {
+    margin: 16px 0 0; padding: 12px 14px; max-height: 220px; overflow: auto;
+    background: rgba(0,0,0,.35); border: 1px solid var(--line); border-radius: 8px;
+    font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color: rgba(233,236,242,.55); white-space: pre-wrap; text-transform: none; letter-spacing: normal;
+  }
 
   /* ----------------------------------------------------------------- HUD */
   .hud { position: absolute; inset: 0; }
@@ -253,7 +275,89 @@
 <body>
   <canvas id="gl"></canvas>
   <div id="ui"></div>
-  <div id="boot">loading orebound</div>
+  <div id="boot"><span>loading orebound</span></div>
+
+  <!--
+    Startup guard. This is a classic script, not a module, so it runs even when
+    the module graph never loads at all (which is exactly what happens when the
+    page is opened from disk). Without it a failed start just sits on "loading
+    orebound" forever with the reason buried in the console.
+  -->
+  <script>
+  (function () {
+    var problems = [];
+    window.__oreboundBooted = false;
+    window.addEventListener('error', function (e) {
+      problems.push(e.message || String(e.error || 'script error'));
+    }, true);
+    window.addEventListener('unhandledrejection', function (e) {
+      problems.push('' + ((e.reason && (e.reason.message || e.reason)) || 'promise rejection'));
+    });
+
+    function panel(title, body, detail) {
+      var b = document.getElementById('boot');
+      if (!b) { b = document.createElement('div'); b.id = 'boot'; document.body.appendChild(b); }
+      b.className = 'failed';
+      b.innerHTML = '';
+      var box = document.createElement('div');
+      box.className = 'boot-panel';
+      var h = document.createElement('h1'); h.textContent = title; box.appendChild(h);
+      var p = document.createElement('div'); p.className = 'boot-body'; p.innerHTML = body; box.appendChild(p);
+      if (detail) {
+        var d = document.createElement('pre'); d.className = 'boot-detail'; d.textContent = detail;
+        box.appendChild(d);
+      }
+      b.appendChild(box);
+    }
+    window.__oreboundFail = panel;
+
+    // 1. Opened straight off the filesystem. The module script is blocked by
+    //    CORS before a single line of game code can run, so say so up front
+    //    rather than waiting for a timeout.
+    if (location.protocol === 'file:') {
+      panel('Orebound needs a local server',
+        '<p>This page was opened directly from your computer, so the browser blocked the game\'s' +
+        ' code from loading. Modern JavaScript modules are not allowed to load over <code>file://</code>.</p>' +
+        '<p><b>On Windows:</b> close this tab and double-click <code>PLAY OREBOUND.bat</code> instead.</p>' +
+        '<p><b>Anywhere else,</b> from a terminal in the <code>orebound</code> folder:</p>' +
+        '<p><code>node serve.mjs</code> &nbsp;— or —&nbsp; <code>python3 -m http.server 8080</code></p>' +
+        '<p>then open <code>http://localhost:8080/</code></p>');
+      return;
+    }
+
+    // 2. Anything else that stops the boot: report what we can actually detect.
+    setTimeout(function () {
+      if (window.__oreboundBooted) return;
+      var gl = null;
+      try { gl = document.createElement('canvas').getContext('webgl2'); } catch (e) { }
+      var modWorker = false;
+      try {
+        var u = URL.createObjectURL(new Blob([''], { type: 'text/javascript' }));
+        var w = new Worker(u, { type: 'module' });
+        w.terminate(); URL.revokeObjectURL(u); modWorker = true;
+      } catch (e) { }
+
+      var why, what;
+      if (!gl) {
+        why = 'Your browser could not create a WebGL2 context';
+        what = '<p>Orebound renders with WebGL2. Try updating your browser, or enabling hardware' +
+          ' acceleration in its settings. In Chrome that is Settings &rsaquo; System &rsaquo;' +
+          ' "Use graphics acceleration when available".</p>' +
+          '<p>You can also check <code>chrome://gpu</code> to see whether WebGL2 is blocked.</p>';
+      } else if (!modWorker) {
+        why = 'Your browser does not support module workers';
+        what = '<p>Orebound generates and meshes terrain on background threads, which needs' +
+          ' module worker support: Chrome 91+, Firefox 114+, or Safari 16.4+.</p>';
+      } else {
+        why = 'Orebound stopped while starting up';
+        what = '<p>The renderer and workers both look available, so this is likely a bug.' +
+          ' The details below are the useful part.</p>';
+      }
+      panel(why, what, problems.length ? problems.slice(0, 6).join('\n\n') : null);
+    }, 10000);
+  })();
+  </script>
+
   <script type="module" src="./src/main.js"></script>
 </body>
 </html>
