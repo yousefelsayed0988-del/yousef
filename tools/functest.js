@@ -250,6 +250,45 @@ const server = http.createServer((req, res) => {
       if (never.length) errs.push('AI states never reached: ' + never.join(','));
     }
 
+    // 10c. can the night still be finished? Walk the whole objective chain.
+    {
+      resume();
+      V.active = false;                       // he is not the thing under test here
+      const chain = [];
+      chain.push('start: ' + objectiveNow());
+      // the fuse box
+      P.tools.screwdriver = true;
+      T('unscrew', () => { P.boxOpen = true; return objectiveNow(); });
+      P.fuses = 4;
+      chain.push('fuses in: ' + objectiveNow());
+      T('power', () => { P.powerOn = true; SFX.hum(true); return objectiveNow(); });
+      // the strongbox
+      T('safe code', () => {
+        openKeypad();
+        for (const ch of safeCode) kpPress(ch);
+        kpPress('OK');                       // the box needs telling you are done
+        resume();
+        return 'safeOpen=' + safeOpen + ' items=' + items.filter(i => i.live && i.type === 'doorkey').length;
+      });
+      const key = items.find(i => i.type === 'doorkey' && i.live);
+      if (key) T('take key', () => { ITEMPICK.doorkey(key); return objectiveNow(); });
+      // the front door, stage by stage
+      P.tools.crowbar = true; P.tools.cutters = true; P.tools.oilcan = true;
+      P.x = exitCell.x + 0.5; P.z = exitCell.y + 0.5;
+      let guard = 0;
+      while (doorStage() !== 'out' && guard++ < 12) {
+        const st = doorStage();
+        try { workTheDoor(); } catch (e) { errs.push('workTheDoor(' + st + '): ' + e.message); break; }
+        chain.push(st + ' -> ' + doorStage());
+        resume();
+      }
+      chain.push('final stage: ' + doorStage() + '  objective: ' + objectiveNow());
+      if (doorStage() !== 'out') errs.push('the front door cannot be finished: stuck at ' + doorStage());
+      T('winGame', () => { winGame(); const w = MODE; resume(); return 'mode was ' + w; });
+      log.push('objective chain: ' + chain.join(' | '));
+      V.active = true;
+    }
+
     // 11. a long soak with the villain hunting
     V.state = 'hunt'; V.lastSeen = { x: Math.floor(P.x), y: Math.floor(P.z) };
     P.alive = true;
