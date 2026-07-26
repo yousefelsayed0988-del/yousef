@@ -248,6 +248,27 @@ Over the internet rather than a LAN, the host needs to forward the port or use
 a tunnel; nothing in the game assumes a local network, but nothing sets that up
 for you either.
 
+### Movement, and why tick order matters
+
+Movement runs on the fixed 20 Hz tick and resolves against the block grid one
+axis at a time (X, then Y, then Z). Per-axis resolution is what stops the two
+classic voxel bugs: catching on the seam between two flush blocks, and
+tunnelling through a wall at speed.
+
+Within a tick the order is **integrate, then apply forces**: the box moves with
+the velocity it already has, and gravity and drag are applied afterwards for the
+next tick. Doing it the other way round looks equivalent and is not — it spends
+a full tick of gravity on the jump impulse before the jump has moved you at all,
+which turns a 0.42 impulse into an 0.83-block hop. That is just under a block, so
+the symptom is not "jumping feels floaty", it is "I cannot get on top of a
+single block, and neither can any mob." With the correct order the same constant
+gives an apex of 1.2522 blocks, and a sprint jump clears about 4.6.
+
+The same rule governs `Entity.physics`, so a mob's obstacle hop clears a full
+block too. Fall distance accumulates the movement actually resolved, including
+the partial tick that lands you, so damage is `ceil(distance - 3)` on the nose
+rather than a point or two light. `tools/smoke.mjs` asserts all of it.
+
 ### Data-driven registries
 
 Blocks, items, recipes, tags, biomes, and loot tables are data. Adding content

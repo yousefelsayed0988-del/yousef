@@ -274,6 +274,60 @@ const probes = await page.evaluate(async () => {
   const m = new Mob(w, 'zombie', g.player.x + 3, w.topSolid(px + 3, pz) + 1, g.player.z);
   w.entities.push(m);
   out.mobSpawned = !!m.def;
+
+  // --- jump: apex height, and whether a running jump clears a 1-block step.
+  // Regression guard for the tick-order bug that applied gravity before the
+  // move, which capped the jump at 0.83 blocks and made a single step unclimbable.
+  {
+    const p = g.player;
+    const bx = Math.floor(p.x), bz = Math.floor(p.z), by = w.topSolid(bx, bz);
+    for (let ax = -8; ax <= 8; ax++) for (let az = -8; az <= 8; az++) {
+      w.setBlock(bx + ax, by, bz + az, STONE);
+      for (let ay = 1; ay <= 6; ay++) w.setBlock(bx + ax, by + ay, bz + az, AIR);
+    }
+    const idle = {
+      forward: false, back: false, left: false, right: false,
+      jump: false, sneak: false, sprint: false, attack: false, use: false,
+    };
+    const rest = () => {
+      p.x = bx + 0.5; p.z = bz + 0.5; p.y = by + 1;
+      p.vx = p.vy = p.vz = 0; p.onGround = true; p.fallDistance = 0;
+    };
+
+    rest();
+    for (let i = 0; i < 3; i++) p.tick(idle);
+    const base = p.y;
+    let apex = 0;
+    p.tick({ ...idle, jump: true });
+    for (let i = 0; i < 40; i++) {
+      apex = Math.max(apex, p.y - base);
+      p.tick(idle);
+      if (p.onGround && i > 2) break;
+    }
+    out.jumpApex = apex;
+
+    for (let ax = -2; ax <= 2; ax++) w.setBlock(bx + ax, by + 1, bz - 3, STONE);
+    rest();
+    p.yaw = 0;                       // face north (-z), towards the step
+    out.jumpedStep = false;
+    for (let i = 0; i < 60; i++) {
+      p.tick({ ...idle, forward: true, jump: true });
+      if (p.onGround && p.y > by + 1.5) { out.jumpedStep = true; break; }
+    }
+    rest();
+
+    // a mob's obstacle hop has to clear a full block too
+    const cow = new Mob(w, 'cow', bx + 3.5, by + 1, bz + 3.5);
+    cow.onGround = true; cow.vy = 0.42;
+    const cy = cow.y;
+    let mobApex = 0;
+    for (let i = 0; i < 30; i++) {
+      cow.physics(0.91);
+      mobApex = Math.max(mobApex, cow.y - cy);
+      if (cow.onGround && i > 2) break;
+    }
+    out.mobJumpApex = mobApex;
+  }
   return out;
 });
 
@@ -301,6 +355,9 @@ check('deepslate below y=0', probes.deepslateBelowZero > 2000, `${probes.deepsla
 check('bedrock at y=-64', probes.bedrockFloor === true);
 check('multiple biomes generate', probes.biomeVariety >= 6, `${probes.biomeVariety}`);
 check('mob constructed', probes.mobSpawned === true);
+check('jump clears 1 block', probes.jumpApex > 1.05 && probes.jumpApex < 1.5, `apex ${probes.jumpApex.toFixed(3)}`);
+check('running jump climbs a step', probes.jumpedStep === true);
+check('mob hop clears 1 block', probes.mobJumpApex > 1.05, `apex ${probes.mobJumpApex.toFixed(3)}`);
 
 // run a bit longer with the mob alive to exercise AI
 await page.waitForTimeout(3000);

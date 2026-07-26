@@ -60,11 +60,9 @@ export class Entity {
     this.inWater = fluidOverlap(w, this.box, 'water') > 0.01;
     this.inLava = fluidOverlap(w, this.box, 'lava') > 0.01;
 
-    if (this.inWater) { this.vy -= 0.02; this.vy *= 0.8; this.vx *= 0.85; this.vz *= 0.85; }
-    else if (this.inLava) { this.vy -= 0.02; this.vy *= 0.5; this.vx *= 0.5; this.vz *= 0.5; }
-    else { this.vy -= this.gravity; this.vy *= DRAG; }
-    if (this.vy < -3.92) this.vy = -3.92;
-
+    // Same ordering rule as the player: integrate first, then apply gravity for
+    // the next tick. Gravity-before-move silently steals a tick of fall from
+    // every jump impulse, which is what kept mobs from hopping a single block.
     const res = moveBox(w, this.box, { x: this.vx, y: this.vy, z: this.vz });
     this.x = (this.box.x0 + this.box.x1) / 2;
     this.y = this.box.y0;
@@ -76,6 +74,11 @@ export class Entity {
     if (res.hitY) this.vy = 0;
     if (this.onGround) { this.vx *= friction; this.vz *= friction; }
     else { this.vx *= 0.96; this.vz *= 0.96; }
+
+    if (this.inWater) { this.vy -= 0.02; this.vy *= 0.8; this.vx *= 0.85; this.vz *= 0.85; }
+    else if (this.inLava) { this.vy -= 0.02; this.vy *= 0.5; this.vx *= 0.5; this.vz *= 0.5; }
+    else { this.vy -= this.gravity; this.vy *= DRAG; }
+    if (this.vy < -3.92) this.vy = -3.92;
 
     if (this.y < WORLD.MIN_Y - 8) this.remove();
   }
@@ -707,7 +710,7 @@ export class Mob extends Entity {
 
     // rabbits and similar move in hops rather than a glide
     if (this.def.hops && this.onGround && this.jumpCooldown <= 0) {
-      this.vy = 0.30;
+      this.vy = 0.26;               // ~0.55 blocks: a hop, not a block-clearing jump
       this.jumpCooldown = 10 + this.rng.int(6);
     }
 
@@ -716,7 +719,7 @@ export class Mob extends Entity {
     const fx = Math.floor(this.x + ax * (this.width / 2 + 0.25));
     const fz = Math.floor(this.z + az * (this.width / 2 + 0.25));
     const fy = Math.floor(this.y);
-    if (this.def.climbs && this.hitWall) { this.vy = Math.max(this.vy, 0.2); return; }
+    if (this.def.climbs && this.hitWall) { this.vy = Math.max(this.vy, 0.12); return; }
     if (this.onGround && this.jumpCooldown <= 0) {
       const ahead = isSolidCube(this.world.getBlock(fx, fy, fz));
       const aheadUp = isSolidCube(this.world.getBlock(fx, fy + 1, fz));

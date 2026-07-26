@@ -176,7 +176,7 @@ export class Player {
     this.vz += (wz - this.vz) * accel;
 
     if (input.jump) {
-      if (this.onLadder) this.vy = 0.16;
+      if (this.onLadder) this.vy = 0.12;   // ~2.4 blocks/s up a ladder
       else if (this.inWater || this.inLava) this.vy = Math.min(this.vy + 0.04, 0.16);
       else if (this.onGround) {
         this.vy = JUMP;
@@ -192,11 +192,10 @@ export class Player {
 
   applyPhysics() {
     const w = this.world;
-    if (this.inWater) { this.vy -= WATER_GRAVITY; this.vy *= 0.80; this.vx *= 0.89; this.vz *= 0.89; }
-    else if (this.inLava) { this.vy -= WATER_GRAVITY; this.vy *= LAVA_DRAG; this.vx *= LAVA_DRAG; this.vz *= LAVA_DRAG; }
-    else { this.vy -= GRAVITY; this.vy *= DRAG; }
-    if (this.vy < -3.92) this.vy = -3.92;
-
+    // Order matters: move with the velocity we have, THEN apply gravity and drag
+    // for the next tick. Applying them first eats a whole tick of gravity out of
+    // the jump impulse before it ever moves you -- that turns a 0.42 jump into an
+    // 0.83-block hop, and you can no longer get on top of a single block.
     const startX = this.x, startZ = this.z;
     setBoxAt(this.box, this.x, this.y, this.z, PW, PH);
 
@@ -238,6 +237,11 @@ export class Player {
     this.y = this.box.y0;
     this.z = (this.box.z0 + this.box.z1) / 2;
 
+    // Fall distance counts the movement actually resolved, including the partial
+    // tick that lands you. Accumulating velocity instead drops that last (fastest)
+    // tick, which made every long fall hurt a point or two less than it should.
+    if (res.y < 0) this.fallDistance -= res.y;
+
     if (res.hitX) this.vx = 0;
     if (res.hitZ) this.vz = 0;
     if (res.hitY) {
@@ -252,8 +256,13 @@ export class Player {
       this.onGround = false;
     }
     if (this.onGround && this.vy <= 0) this.fallDistance = 0;
-    if (!this.onGround && this.vy < 0) this.fallDistance -= this.vy;
     if (this.inWater || this.inLava || this.onLadder) this.fallDistance = 0;
+
+    // gravity and drag for the next tick (see the note at the top)
+    if (this.inWater) { this.vy -= WATER_GRAVITY; this.vy *= 0.80; this.vx *= 0.89; this.vz *= 0.89; }
+    else if (this.inLava) { this.vy -= WATER_GRAVITY; this.vy *= LAVA_DRAG; this.vx *= LAVA_DRAG; this.vz *= LAVA_DRAG; }
+    else { this.vy -= GRAVITY; this.vy *= DRAG; }
+    if (this.vy < -3.92) this.vy = -3.92;
 
     // world border + void
     const B = WORLD.BORDER;
@@ -279,7 +288,7 @@ export class Player {
 
   handleFall() {
     if (this.fallDistance > 3.0) {
-      const dmg = Math.floor(this.fallDistance - 3.0);
+      const dmg = Math.ceil(this.fallDistance - 3.0);
       if (dmg > 0) {
         this.damage(dmg, 'fall');
         this.game.audio.play('hurt');
