@@ -19,7 +19,7 @@ if not defined PY (
   echo  this file again.
   echo.
   echo  You do not need the EXE to play - just double-click
-   echo  "PLAY HOLLOWMERE.bat" or open index.html in your browser.
+  echo  "PLAY HOLLOWMERE.bat" or open index.html in your browser.
   echo.
   pause
   exit /b 1
@@ -39,7 +39,10 @@ if errorlevel 1 (
 )
 echo.
 echo  [2/3] compiling - this takes a minute or two
-%PY% -m PyInstaller --onefile --noconsole --clean --name HOLLOWMERE --icon HOLLOWMERE.ico --add-data "index.html;." hollowmere.py
+set ICON=
+if exist "HOLLOWMERE.ico" set ICON=--icon HOLLOWMERE.ico
+if not exist "HOLLOWMERE.ico" echo  (no HOLLOWMERE.ico here - building with the default icon)
+%PY% -m PyInstaller --onefile --noconsole --clean --name HOLLOWMERE %ICON% --add-data "index.html;." hollowmere.py
 if errorlevel 1 (
   echo.
   echo  The build failed. Scroll up for the reason.
@@ -50,7 +53,15 @@ if errorlevel 1 (
 echo.
 echo  [3/3] tidying up
 if exist "HOLLOWMERE.exe" del /q "HOLLOWMERE.exe"
-move /y "dist\\HOLLOWMERE.exe" "HOLLOWMERE.exe" >nul
+move /y "dist\HOLLOWMERE.exe" "HOLLOWMERE.exe" >nul
+if errorlevel 1 (
+  echo.
+  echo  The build finished but HOLLOWMERE.exe could not be moved out of
+  echo  dist\. It is still in there - drag it out yourself.
+  echo.
+  pause
+  exit /b 1
+)
 rmdir /s /q build >nul 2>&1
 rmdir /s /q dist >nul 2>&1
 del /q HOLLOWMERE.spec >nul 2>&1
