@@ -7095,7 +7095,7 @@ function startGame(){
   P.beat = 0; P.beatPhase = 0; P.wound = 0; P.breathFog = 0; P.fadeOut = 0;
 
   V.x = spawn.villain.x; V.z = spawn.villain.y;
-  V.state = 'walk'; V.stun = 0; V.lastSeen = null; V.active = true; V.anim = 0; V.busy = 0;
+  V.state = 'walk'; V.stun = 0; V.active = true; V.anim = 0; V.busy = 0;
   resetMind();
 
   // QA: put him in front of the camera down a clear line of sight
@@ -7324,7 +7324,11 @@ const MIC = {
 };
 
 /* every sound you make, from either world, collapses into one number */
-const NOISE = { mic: 0, move: 0, step: 0, stepAt: null, level: 0, alertT: 0, heardAt: null, flashT: 0 };
+/* src: whose noise the current level belongs to. 'player' is you moving and
+   your own microphone; 'world' is a bottle, a music box, a wound-down thing
+   somewhere else in the house. The Lodger cannot tell them apart - which is
+   the point - but he has to walk to the right cell. */
+const NOISE = { mic: 0, move: 0, step: 0, stepAt: null, level: 0, alertT: 0, heardAt: null, flashT: 0, src: 'player' };
 function updateNoise(dt){
   const crouching = P.crouch > 0.5;
   const walking = P.moving > 0.05;
@@ -7344,6 +7348,7 @@ function updateNoise(dt){
   const loud = Math.max(NOISE.move, NOISE.mic, NOISE.step);
   const quiet = Math.min(Math.max(NOISE.move, NOISE.step), NOISE.mic);
   NOISE.level = clamp01((loud + quiet * 0.55) * noiseScale());
+  NOISE.src = 'player';
   if (NOISE.alertT > 0) NOISE.alertT -= dt;
   if (NOISE.flashT > 0) NOISE.flashT -= dt;
 
@@ -7649,6 +7654,8 @@ function updateVillain(dt){
   const near = Math.max(0, 1 - dist / 14);
 
   V.rage = villainRage();
+  // frustration bleeds off slowly on its own; only empty searches build it
+  M.frustration = Math.max(0, M.frustration - dt * 0.012);
 
   /* ---- he is down ------------------------------------------------- */
   if (V.stun > 0){
@@ -7733,11 +7740,18 @@ function updateVillain(dt){
      WHAT HE NOW BELIEVES
      ================================================================= */
   if (sees || heard){
-    const cell = (NOISE.step > 0.05 && NOISE.stepAt) ? NOISE.stepAt
+    /* Where the noise actually came from. A smashing bottle raises the same
+       global level a footstep does, and the first version of this read that
+       level and then handed him the PLAYER's cell - so throwing a bottle
+       walked him straight to you. NOISE.src says whose noise it was. */
+    const fromWorld = !sees && NOISE.src === 'world' && NOISE.heardAt;
+    const cell = fromWorld ? NOISE.heardAt
+               : (!sees && NOISE.step > 0.05 && NOISE.stepAt) ? NOISE.stepAt
                : { x: Math.floor(P.x), y: Math.floor(P.z) };
     M.lastKnown = cell;
     NOISE.heardAt = cell;
-    const gain = sees ? 1.0 : clamp01(0.30 + NOISE.level * 0.9);
+    // something he cannot see is never a certainty, however loud it was
+    const gain = sees ? 1.0 : clamp01((0.30 + NOISE.level * 0.9) * (fromWorld ? 0.72 : 1));
     if (M.conf < 0.35 && gain > 0.5 && V.roarT <= 0 && dist < 16){
       V.roarT = 1.3; setVState('roar'); SFX.roar();
       NOISE.flashT = 1.6;
@@ -7753,8 +7767,12 @@ function updateVillain(dt){
     M.lastKnown = { x: Math.floor(bloodHit.x), y: Math.floor(bloodHit.z) };
     M.conf = Math.max(M.conf, 0.42);
   } else {
-    // belief rots. Faster on the easy nights, barely at all on the worst.
-    M.conf = Math.max(0, M.conf - dt * (0.115 / Math.max(0.2, D().lose)));
+    /* Belief rots. D().lose is 1.6 on Uneasy and 0.35 on No Escape - it is
+       how FAST he forgets - so it multiplies. Dividing by it did the exact
+       opposite of what the difficulty table and its own blurb promise: he
+       held onto your last known position four and a half times longer on
+       the easiest night than on the hardest. */
+    M.conf = Math.max(0, M.conf - dt * 0.115 * Math.max(0.15, D().lose));
   }
 
   /* =================================================================
@@ -7783,8 +7801,11 @@ function updateVillain(dt){
     if (V.state === 'search' && V.stateT > 16) setVState('patrol');
     else if (V.state !== 'search' && V.state !== 'check' && V.state !== 'listen') setVState('patrol');
     // even on patrol he stops dead every so often and just listens
-    if (V.state === 'patrol' && V.stateT > 7 + rng() * 9) setVState('listen');
-    if (V.state === 'listen' && V.stateT > 1.4 + rng() * 2.0) setVState('patrol');
+    /* The angrier a fruitless night has made him, the less he stands
+       around: he stops less often and for less time. */
+    const fr = M.frustration;
+    if (V.state === 'patrol' && V.stateT > (7 + rng() * 9) * (1 - fr * 0.55)) setVState('listen');
+    if (V.state === 'listen' && V.stateT > (1.4 + rng() * 2.0) * (1 - fr * 0.45)) setVState('patrol');
   }
 
   if (prev !== V.state && (V.state === 'listen' || V.state === 'search')){
@@ -7828,7 +7849,11 @@ function updateVillain(dt){
        what a frightened person does, then cell by cell. */
     if (!M.sweep) beginSweep(roomAtCell(Math.floor(V.x), Math.floor(V.z)) || pickSweepRoom());
     const hides = hidesInRoom(M.sweep).filter(h => !h.__checked || M.clock - h.__checked > 45);
-    if (hides.length && rng() < 0.5 + V.rage * 0.4){
+    /* Whether he bothers with the hiding places is decided once, when the
+       sweep starts. Rolling it inside the per-frame branch turned a coin
+       flip into a certainty within three frames, so he always checked every
+       wardrobe in the room and hiding never survived a search. */
+    if (hides.length && M.sweepHides){
       V.checkHide = hides[0];
       setVState('check');
     } else if (M.sweepCells.length){
@@ -7866,9 +7891,9 @@ function updateVillain(dt){
   else if (V.state === 'lunge')      spd = 3.6 * D().speed;
   else if (V.state === 'stalk')      spd = 1.55 * D().speed * (1 + V.rage * 0.25);
   else if (V.state === 'investigate')spd = 2.05 * D().patrol * (1 + V.rage * 0.3);
-  else if (V.state === 'search')     spd = 1.30 * D().patrol;
-  else if (V.state === 'check')      spd = 1.65 * D().patrol;
-  else if (V.state === 'patrol')     spd = 1.15 * D().patrol * (1 + V.rage * 0.35);
+  else if (V.state === 'search')     spd = 1.30 * D().patrol * (1 + M.frustration * 0.30);
+  else if (V.state === 'check')      spd = 1.65 * D().patrol * (1 + M.frustration * 0.24);
+  else if (V.state === 'patrol')     spd = 1.15 * D().patrol * (1 + V.rage * 0.35 + M.frustration * 0.42);
   spd *= (1 - V.limp * 0.16);
 
   /* being looked at slows him. Hold your light on him long enough and he
@@ -7891,13 +7916,21 @@ function updateVillain(dt){
     // a burning flare bends him around it rather than through it
     const push = wardPush(V.x + tdx * 0.5, V.z + tdz * 0.5);
     if (push){
-      tdx += push[0] * 2.4; tdz += push[1] * 2.4;
-      const l2 = Math.hypot(tdx, tdz) || 1;
-      tdx /= l2; tdz /= l2;
+      let px = tdx + push[0] * 2.4, pz = tdz + push[1] * 2.4;
+      const l2 = Math.hypot(px, pz) || 1;
+      px /= l2; pz /= l2;
+      /* Only take the detour if it is somewhere he can actually stand.
+         Nothing else in here tests the grid against his position, so an
+         unchecked push would walk him into the wall and, if he ended up
+         boxed in, leave the pathfinder with nowhere to send him ever again. */
+      if (!solid(Math.floor(V.x + px * 0.55), Math.floor(V.z + pz * 0.55))){
+        tdx = px; tdz = pz;
+      }
       if (V.dragT <= 0){ V.dragT = 1.4; if (dist < 12) SFX.wardHiss(); }
     }
-    V.x += tdx * spd * dt;
-    V.z += tdz * spd * dt;
+    const stepX = V.x + tdx * spd * dt, stepZ = V.z + tdz * spd * dt;
+    if (!solid(Math.floor(stepX), Math.floor(V.z))) V.x = stepX;
+    if (!solid(Math.floor(V.x), Math.floor(stepZ))) V.z = stepZ;
     const want = Math.atan2(tdz, tdx);
     let diff = ((want - V.ang + Math.PI*3) % (Math.PI*2)) - Math.PI;
     V.ang += diff * Math.min(1, dt * 7);
@@ -7976,11 +8009,16 @@ function updateVillain(dt){
   }
 
   /* pose */
+  /* 'listen' and 'crouchLook' both hold the legs at fixed values, so they
+     can only be used once he has stopped. While he is still crossing the
+     room to a wardrobe he has to be walking like anyone else. */
+  const atHide = V.state === 'check' && V.checkHide &&
+                 Math.hypot(V.checkHide.x - V.x, V.checkHide.z - V.z) < 1.35;
   const poseName =
       V.state === 'lunge' ? 'lunge'
     : V.state === 'roar'  ? 'roar'
     : V.state === 'listen'? 'listen'
-    : V.state === 'check' ? (V.checkHide && V.checkHide.kind === 'bed' ? 'crouchLook' : 'listen')
+    : atHide ? (V.checkHide.kind === 'bed' ? 'crouchLook' : 'listen')
     : V.speed > 2.4 ? 'hunt'
     : V.speed > 0.1 ? 'walk'
     : 'idle';
@@ -7997,21 +8035,14 @@ function updateVillain(dt){
   if (dist < 0.72 && P.alive && !P.hidden) die();
 }
 
-/* he has arrived at a wound-down music box and is taking it apart */
-function smashLureAt(l){
-  l.until = 0;
-  for (const t of THROWN) if (t.kind === 'box' && Math.hypot(t.x - l.x, t.z - l.z) < 0.9) t.until = 0;
-  for (const it of items) if (it.type === 'boxSet' && Math.hypot(it.x - l.x, it.y - l.z) < 0.9) it.live = false;
-  SFX.doorSmash();
-  if (Math.hypot(P.x - l.x, P.z - l.z) < 14)
-    subtitle('Somewhere behind you the music stops, all at once, in pieces.');
-}
-
 /* start turning a room over */
 function beginSweep(r){
   const M = V.mind;
   M.sweep = r || null;
   M.sweepCells = r ? sweepCellsOf(r).slice(0, 14) : [];
+  // decided once per sweep, and the angrier and more frustrated he is the
+  // more likely he is to go through the furniture rather than the floor
+  M.sweepHides = rng() < 0.42 + V.rage * 0.34 + M.frustration * 0.24;
 }
 
 /* he opens the wardrobe, or he gets down and looks under the bed */
@@ -8167,7 +8198,14 @@ function hitVillain(seconds, how){
   V.stun = Math.max(V.stun, seconds);
   V.state = 'stun';
   V.speed = 0;
-  V.lastSeen = { x: Math.floor(P.x), y: Math.floor(P.z) };   // he still knows where the noise came from
+  /* He still knows where it came from. This used to be written to V.lastSeen,
+     which nothing reads any more - so every shot you landed actually made him
+     LESS certain, and he came up off the floor tracking your live position
+     instead of the doorway you fired from. */
+  if (V.mind){
+    V.mind.lastKnown = { x: Math.floor(P.x), y: Math.floor(P.z) };
+    V.mind.conf = Math.max(V.mind.conf, 0.85);
+  }
   P.hits = (P.hits || 0) + 1;
   SFX.growl();
   flashAmt = Math.max(flashAmt, 0.30);
@@ -8209,6 +8247,7 @@ function fireWeapon(){
 
   // a gunshot in a dead house is the loudest thing you will ever do
   NOISE.level = Math.max(NOISE.level, w.noise);
+  NOISE.src = 'player';
   NOISE.alertT = 2.2;
   NOISE.heardAt = { x: Math.floor(P.x), y: Math.floor(P.z) };
 
@@ -8266,9 +8305,13 @@ function updateCombat(dt){
       SFX.trapSnap();
       P.stam = Math.max(0, P.stam - 0.55);
       P.trapHurt = 3.4;
+      // and now you are leaving him a trail, until you dress it
+      P.bleed = Math.max(P.bleed || 0, 0.85);
+      P.bleedT = 0;
       NOISE.level = Math.max(NOISE.level, 0.7);
+      NOISE.src = 'player';
       flashAmt = Math.max(flashAmt, 0.35);
-      subtitle('Your own trap. It takes a piece of your calf with it.');
+      subtitle('Your own trap. It takes a piece of your calf with it. You are going to leave a trail now - [B] if you have a dressing.');
     }
   }
   if (P.trapHurt > 0) P.trapHurt = Math.max(0, P.trapHurt - dt);
@@ -8636,15 +8679,41 @@ function noiseScale(){ return (P.adrenT > 0) ? 1.30 : 1.0; }
 
 /* one place for "he heard that, and he heard it THERE" */
 function makeNoise(level, seconds, cx, cz){
-  NOISE.level = Math.max(NOISE.level, clamp01(level * noiseScale()));
+  const lv = clamp01(level * noiseScale());
+  // only claim the channel if this is genuinely louder than you are
+  if (lv >= NOISE.level){
+    NOISE.level = lv;
+    NOISE.src = 'world';
+    NOISE.heardAt = { x: Math.floor(cx), y: Math.floor(cz) };
+  }
   NOISE.alertT = Math.max(NOISE.alertT, seconds);
-  NOISE.heardAt = { x: Math.floor(cx), y: Math.floor(cz) };
   NOISE.flashT = 0.5;
 }
 
 /* the syringe in your leg and the blood coming out of it */
 function moveScale(){
   return (1 + ((P.adrenT > 0) ? 0.22 : 0)) * (1 - Math.min(0.28, (P.bleed || 0) * 0.28));
+}
+
+/* the model a placed music box leaves behind, taken off the floor when the
+   box itself is gone - either because he broke it or because it wound down */
+function clearBoxProp(t){
+  for (const it of items)
+    if (it.type === 'boxSet' && it.live && Math.hypot(it.x - t.x, it.y - t.z) < 0.9) it.live = false;
+}
+
+/* Where a thrown thing actually leaves your hand. Your collision radius is
+   0.26, so reaching a flat 0.35 in front of you put it inside the wall when
+   you were pressed against one - and a lure on a solid cell is one the
+   Lodger's pathfinder can never reach, so he would stand and think about it
+   forever. Stay on your own square if the next one is not clear. */
+function throwX(fx){
+  const nx = P.x + fx * 0.35;
+  return solid(Math.floor(nx), Math.floor(P.z)) ? P.x : nx;
+}
+function throwZ(fz){
+  const nz = P.z + fz * 0.35;
+  return solid(Math.floor(P.x), Math.floor(nz)) ? P.z : nz;
 }
 
 /* a bottle leaves your hand at chest height and does the rest itself */
@@ -8678,6 +8747,13 @@ function updateThrown(dt){
           t.state = 'burn';
           t.vx = t.vy = t.vz = 0;
           makeNoise(0.22, 0.8, t.x, t.z);
+          /* Nothing iterates THROWN when the world is drawn, so a burning
+             flare was a light source with no object under it - a red pool
+             on the boards coming from nowhere. Put the lit model into the
+             pickup list, which is already drawn, and tag it so scanNear
+             never offers it and so we can take it away again. */
+          items.push({ type:'flareLit', x: t.x, y: t.z, live: true, noPick: true, bob: rng()*6.28 });
+          t.propAt = { x: t.x, z: t.z };
         }
       }
       continue;
@@ -8686,6 +8762,10 @@ function updateThrown(dt){
     if (t.kind === 'flare'){
       t.life -= dt;
       if (t.life <= 0){
+        if (t.propAt)
+          for (const it of items)
+            if (it.type === 'flareLit' && it.live &&
+                Math.hypot(it.x - t.propAt.x, it.y - t.propAt.z) < 0.4) it.live = false;
         THROWN.splice(i, 1);
         subtitle('The flare gutters out. The red goes off the walls all at once.');
       }
@@ -8699,6 +8779,7 @@ function updateThrown(dt){
         V.busy = Math.max(V.busy || 0, t.smashT);
         if (t.smashT <= 0){
           SFX.crunch();
+          clearBoxProp(t);
           THROWN.splice(i, 1);
           subtitle('The music stops in the middle of a bar.');
         }
@@ -8713,7 +8794,9 @@ function updateThrown(dt){
         SFX.growl();
         subtitle('He has found it. He is on his knees over it with both hands.');
       }
-      if (t.life <= 0){ THROWN.splice(i, 1); }
+      // and when it simply winds down, the box is still on the boards but
+      // it is no longer anything he cares about
+      if (t.life <= 0){ clearBoxProp(t); THROWN.splice(i, 1); }
       continue;
     }
 
@@ -8791,7 +8874,7 @@ function throwBottle(){
   const fx = Math.cos(P.ang), fz = Math.sin(P.ang);
   const up = Math.sin(P.pitch || 0);
   THROWN.push({
-    kind:'bottle', x: P.x + fx*0.35, y: lerp(1.50, 0.95, P.crouch), z: P.z + fz*0.35,
+    kind:'bottle', x: throwX(fx), y: lerp(1.50, 0.95, P.crouch), z: throwZ(fz),
     vx: fx*9.5, vy: 2.6 + up*6.0, vz: fz*9.5, spin: rng()*6.28, life: 9
   });
   SFX.swing();
@@ -8807,7 +8890,7 @@ function strikeFlare(){
   const fx = Math.cos(P.ang), fz = Math.sin(P.ang);
   const up = Math.sin(P.pitch || 0);
   THROWN.push({
-    kind:'flare', state:'fly', x: P.x + fx*0.35, y: lerp(1.45, 0.95, P.crouch), z: P.z + fz*0.35,
+    kind:'flare', state:'fly', x: throwX(fx), y: lerp(1.45, 0.95, P.crouch), z: throwZ(fz),
     vx: fx*7.0, vy: 2.2 + up*5.0, vz: fz*7.0, spin: rng()*6.28, life: 35.0
   });
   SFX.flareStrike();
@@ -9126,8 +9209,11 @@ function interact(){
       SFX.clunk(); SFX.spark(); SFX.hum(true);
       flashAmt = 0.55;
       subtitle('The house wakes up. Every light in the hall comes on at once.');
+      /* The lights coming on is meant to bring him at a run. Writing
+         V.state directly no longer does anything - the mind recomputes it
+         from confidence every frame - so tell him what he believes. */
+      if (V.mind){ V.mind.conf = 1.0; V.mind.lastKnown = { x: Math.floor(P.x), y: Math.floor(P.z) }; }
       V.state = 'hunt';
-      V.lastSeen = { x: Math.floor(P.x), y: Math.floor(P.z) };
     } else {
       SFX.clunk();
       subtitle('Four sockets. ' + P.fuses + ' filled. It needs all four.');
@@ -9192,7 +9278,7 @@ function updateHUD(){
   if (arm){
     const rows = [];
     const w = P.weapon ? WEAPONS[P.weapon] : null;
-    rows.push(w ? ('&#9656; ' + w.label.toUpperCase() + '  ' + (P.ammo[w.ammoKey]|0))
+    rows.push(w ? ('&#9656; ' + w.label.toUpperCase() + (w.melee ? '' : '  ' + (P.ammo[w.ammoKey]|0)))
                : '&#9656; TORCH  [2]/[3] for a weapon');
     if (P.has.pistol && P.weapon !== 'pistol') rows.push('&nbsp;&nbsp; Pistol ' + (P.ammo.pistol|0) + '  [2]');
     if (P.has.shotgun && P.weapon !== 'shotgun') rows.push('&nbsp;&nbsp; Shotgun ' + (P.ammo.shotgun|0) + '  [3]');
@@ -9560,8 +9646,8 @@ function cinePower(onDone){
   playCutscene(shots, () => {
     // he keeps the position he was revealed in, but never right on top of you
     if (Math.hypot(V.x - P.x, V.z - P.z) < 5){ V.x = homeX; V.z = homeZ; }
+    if (V.mind){ V.mind.conf = 1.0; V.mind.lastKnown = { x: Math.floor(P.x), y: Math.floor(P.z) }; }
     V.state = 'hunt';
-    V.lastSeen = { x: Math.floor(P.x), y: Math.floor(P.z) };
     placeVillain();
     if (onDone) onDone();
   });

@@ -38,6 +38,12 @@ const server = http.createServer((req, res) => {
     // the Lodger will happily kill the player halfway through a mechanical
     // test; put the world back on its feet between sections
     const resume = () => { setMode('play'); P.alive = true; P.fadeOut = 0; V.stun = 0; V.active = true; V.busy = 0; };
+    // the game only empties THROWN in startGame, which rebuilds `items` too;
+    // a test that empties it by hand has to take the props with it
+    const clearThrown = () => {
+      THROWN.length = 0; LURES.length = 0; WARDS.length = 0;
+      for (const it of items) if (it.type === 'flareLit' || it.type === 'boxSet' || it.type === 'bottleShards') it.live = false;
+    };
     const frames = n => { for (let i = 0; i < n; i++) { try { updateThrown(0.05); updateBoons(0.05); updateVillain(0.05); updateCombat(0.05); updateDoors(0.05); updateNoise(0.05); } catch (e) { errs.push('tick: ' + e.message); break; } } };
 
     // 1. every declared item model must compile and be registered
@@ -287,6 +293,76 @@ const server = http.createServer((req, res) => {
       T('winGame', () => { winGame(); const w = MODE; resume(); return 'mode was ' + w; });
       log.push('objective chain: ' + chain.join(' | '));
       V.active = true;
+    }
+
+    // 10d. the distraction items must actually distract. A bottle raises the
+    //      same global noise level a footstep does, so the whole point of it
+    //      is that he walks to the BOTTLE and not to you.
+    {
+      resume();
+      resetMind();
+      clearThrown(); BLOODTRAIL.length = 0;
+      NOISE.level = 0; NOISE.mic = 0; NOISE.move = 0; NOISE.step = 0; NOISE.src = 'player';
+      const fl = [];
+      for (let gy = 1; gy < MH - 1; gy++) for (let gx = 1; gx < MW - 1; gx++)
+        if (!solid(gx, gy) && !doorAt(gx, gy)) fl.push({ x: gx, y: gy });
+      P.x = fl[0].x + 0.5; P.z = fl[0].y + 0.5;
+      // him a fair way off, and a bottle landing well to one side of you
+      let him = fl[0], spot = fl[0];
+      for (const f of fl) { const d = Math.hypot(f.x + .5 - P.x, f.y + .5 - P.z); if (d > 9 && d < 13) { him = f; break; } }
+      for (const f of fl) { const d = Math.hypot(f.x + .5 - P.x, f.y + .5 - P.z);
+        const dh = Math.hypot(f.x + .5 - (him.x + .5), f.y + .5 - (him.y + .5));
+        if (d > 6 && d < 10 && dh > 5) { spot = f; break; } }
+      V.x = him.x + 0.5; V.z = him.y + 0.5;
+      THROWN.push({ kind: 'bottle', x: spot.x + 0.5, y: 1.2, z: spot.y + 0.5, vx: 0, vy: -0.1, vz: 0, spin: 0, life: 9 });
+      let nearestToSpot = 99, nearestToPlayer = 99;
+      for (let i = 0; i < 260; i++) {
+        P.alive = true; V.active = true;
+        try { updateThrown(0.05); updateBoons(0.05); updateVillain(0.05); } catch (e) { errs.push('bottle tick: ' + e.message); break; }
+        nearestToSpot = Math.min(nearestToSpot, Math.hypot(V.x - (spot.x + 0.5), V.z - (spot.y + 0.5)));
+        nearestToPlayer = Math.min(nearestToPlayer, Math.hypot(V.x - P.x, V.z - P.z));
+      }
+      log.push('bottle lure: he got within ' + nearestToSpot.toFixed(1) + 'm of the bottle and ' +
+               nearestToPlayer.toFixed(1) + 'm of the player (shards on floor: ' +
+               items.filter(i => i.live && i.type === 'bottleShards').length + ')');
+      if (nearestToSpot > 2.5) errs.push('a thrown bottle does not draw him: closest approach ' + nearestToSpot.toFixed(1) + 'm');
+      if (nearestToPlayer < nearestToSpot) errs.push('a thrown bottle draws him to the PLAYER instead of the bottle');
+    }
+
+    // 10e. a burning flare must have a body, and must keep him off
+    {
+      resume();
+      resetMind();
+      clearThrown();
+      THROWN.push({ kind: 'flare', state: 'fly', x: P.x + 1.2, y: 0.6, z: P.z, vx: 0, vy: -0.2, vz: 0, spin: 0, life: 35 });
+      for (let i = 0; i < 20; i++) updateThrown(0.05);
+      const lit = items.filter(i => i.live && i.type === 'flareLit').length;
+      log.push('flare: burning=' + THROWN.filter(t => t.kind === 'flare' && t.state === 'burn').length +
+               ' body on floor=' + lit + ' wards=' + WARDS.length + ' lights=' + extraLights().length);
+      if (!lit) errs.push('a burning flare has no visible body');
+      if (!WARDS.length) errs.push('a burning flare does not ward him off');
+      // and it must clean itself up
+      for (const t of THROWN) if (t.kind === 'flare') t.life = 0.01;
+      for (let i = 0; i < 5; i++) updateThrown(0.05);
+      if (items.filter(i => i.live && i.type === 'flareLit').length)
+        errs.push('a burnt-out flare leaves its body on the floor forever');
+    }
+
+    // 10f. a music box must be destroyable, and take its model with it
+    {
+      resume();
+      resetMind();
+      clearThrown();
+      P.boxes = 1;
+      placeMusicBox();
+      const boxes0 = items.filter(i => i.live && i.type === 'boxSet').length;
+      V.x = P.x; V.z = P.z; V.stun = 0; V.active = true;
+      for (let i = 0; i < 200; i++) { P.alive = true; updateThrown(0.05); }
+      log.push('music box: props before=' + boxes0 + ' after=' +
+               items.filter(i => i.live && i.type === 'boxSet').length +
+               ' still playing=' + THROWN.filter(t => t.kind === 'box').length);
+      if (THROWN.filter(t => t.kind === 'box').length) errs.push('the music box survives him breaking it');
+      if (items.filter(i => i.live && i.type === 'boxSet').length) errs.push('a broken music box leaves its model behind');
     }
 
     // 11. a long soak with the villain hunting
