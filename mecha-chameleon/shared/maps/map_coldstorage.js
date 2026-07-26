@@ -148,13 +148,13 @@ export function build() {
 
   // Under the bottom beam is a metre and a third of black, and the lamps never
   // point that way. This is the map's bread and butter.
-  m.spot(-20.0, 0, -13.7, { stance: 'crouch', quality: 0.88, hint: 'Under the bottom beam, north row' });
+  m.spot(-22.5, 0, -13.7, { stance: 'crouch', quality: 0.88, hint: 'Under the bottom beam, north row' });
   m.spot(-9.0, 0, -6.3, { stance: 'crouch', quality: 0.86, hint: 'Deep under the second rack' });
   m.spot(-16.5, 0, -0.3, { stance: 'crouch', quality: 0.85, hint: 'Bottom bay, middle row' });
-  m.spot(-11.0, 0, 5.7, { stance: 'crouch', quality: 0.84, hint: 'Under the racking, south of the aisle' });
+  m.spot(-14.5, 0, 5.7, { stance: 'crouch', quality: 0.84, hint: 'Under the racking, south of the aisle' });
   m.spot(-22.5, 0, 11.7, { stance: 'crouch', quality: 0.84, hint: 'Last bay before the south alley' });
   m.spot(7.5, 0, -12.3, { stance: 'crouch', quality: 0.82, hint: 'East run, under the bottom beam' });
-  m.spot(4.0, 0, 4.3, { stance: 'crouch', quality: 0.8, hint: 'Bottom bay of the east racking' });
+  m.spot(6.5, 0, 4.3, { stance: 'crouch', quality: 0.8, hint: 'Bottom bay of the east racking' });
   // Second level, reachable by stepping off the catwalk.
   m.spot(-20.0, 3.04, -7.7, { stance: 'prone', quality: 0.82, hint: 'Flat on the second rack level' });
   m.spot(-13.5, 3.04, 5.7, { stance: 'prone', quality: 0.8, hint: 'Up on the racking, behind a pallet' });
@@ -228,7 +228,8 @@ export function build() {
   m.crateStack(-26.2, -16.4, CRATE_G, 3, 1.0);
   m.crateStack(11.5, 17.6, CRATE_R, 3, 0.95);
   m.crateStack(-6.0, 18.6, CRATE_G, 2, 1.05);
-  m.crateStack(9.0, -18.2, CARD, 3, 0.9);
+  m.crateStack(9.0, -18.2, CARD, 3, 0.9, { spot: false });
+  m.spot(9.0, 0, -16.9, { stance: 'crouch', quality: 0.72, hint: 'Beside the crate stack in the north alley' });
   for (let i = 0; i < 10; i++) {
     const zone = m.irange(0, 2);
     const cx = zone === 0 ? m.range(-27, -6) : zone === 1 ? m.range(2, 13) : m.range(16, 27);

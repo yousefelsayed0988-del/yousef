@@ -10,6 +10,8 @@ mecha-chameleon/
     constants.js   tunables + enums          math.js      vectors, matrices, rng
     color.js       colour + distance metric  blend.js     camouflage scoring
     collision.js   world, capsule move, raycast, LOS, surroundings
+    movement.js    one input step, run identically by client and server
+    navgraph.js    walkable graph baked from collision geometry + A*
     protocol.js    opcodes + payload sanitisers
     maps/kit.js    map authoring DSL         maps/index.js  the 18-map roster
     maps/map_*.js  one file per map
@@ -25,8 +27,22 @@ mecha-chameleon/
     js/main.js  js/net.js  js/input.js  js/audio.js  js/chameleon.js
     js/gl/renderer.js  js/gl/shaders.js  js/gl/meshes.js
     js/ui.js    js/paintui.js  js/hud.js
-  tools/       validate-maps.js, test-sim.js, e2e.js
+  tools/       validate-maps.js  test-sim.js  test-anticheat.js
+               e2e.js (real browsers)  model-shot.js (pose renders)
 ```
+
+Movement is the one piece of code that MUST be identical on both ends:
+`shared/movement.js` is what the client predicts with, what the server decides
+with, and what the anti-cheat compares against. Forking a constant out of it
+shows up as rubber-banding and then as false-positive strikes.
+
+Bots need to route around walls, which pure steering cannot do — they park in
+the first wall between them and their goal. `shared/navgraph.js` samples
+standable ground on a grid (several levels per cell, so balconies and stair
+landings are their own nodes), links neighbours a player could actually walk
+between (including up a staircase, which climbs far more than a step height
+between two grid cells), and A*s over it. It is built once per world and
+cached, and a cross-map query costs about 0.03 ms.
 
 **Golden rule:** anything under `shared/` runs in Node *and* the browser. No
 `document`, no `require`, no `fs`. Import with explicit `.js` extensions.

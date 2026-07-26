@@ -257,7 +257,7 @@ export function build() {
   vending(9.6, -4.0, 0, ACCENT);
   vending(10.8, -4.0, 0, AMBER);
   m.spot(-14.3, PLAT_Y, 4.1, { stance: 'crouch', quality: 0.76, hint: 'At the end of the vending bank' });
-  m.spot(10.2, PLAT_Y, -4.4, { stance: 'crouch', quality: 0.7, hint: 'Squeezed behind the snack machines' });
+  m.spot(10.2, PLAT_Y, -5.1, { stance: 'crouch', quality: 0.7, hint: 'Squeezed behind the snack machines' });
 
   for (const [bx, bz] of [[-27, 3.4], [-6, -3.6], [3, 3.6], [16, -3.6]]) {
     m.cyl(bx, PLAT_Y, bz, 0.33, 0.95, CONCRETE_DK, { tag: 'litterBin' });
@@ -297,7 +297,7 @@ export function build() {
       m.box(21.0, PLAT_Y + 0.72, gz, 0.06, 0.06, 0.9, STEEL, { solid: false, yaw: k * 60, tag: 'tripod' });
     }
   }
-  m.spot(20.8, PLAT_Y, 6.4, { stance: 'crouch', quality: 0.62, hint: 'At the end of the turnstile bank' });
+  m.spot(19.6, PLAT_Y, 5.7, { stance: 'crouch', quality: 0.62, hint: 'At the end of the turnstile bank' });
 
   const ticketMachine = (x, z, yaw) => {
     const a = yaw * Math.PI / 180;

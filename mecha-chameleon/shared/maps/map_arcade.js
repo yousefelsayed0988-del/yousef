@@ -118,10 +118,11 @@ export function build() {
     m.box(x, 0.9, z, 3.0, 0.05, 0.05, '#6d5238', { yaw: yaw + 12, solid: false });
     m.spot(x, 0, z, { stance: 'prone', quality: 0.82, hint: 'Flat under the pool table' });
   };
-  poolTable(15.4, -9.5, 0);
-  poolTable(15.4, -3.4, 0);
-  m.box(15.4, 3.2, -6.4, 2.6, 0.12, 2.6, '#e8e4d8', { solid: false, emis: 1.1 });
-  m.light(15.4, 3.0, -6.4, '#fff0c8', 0.9, 9);
+  // Both tables sit south of z = -8.65, where the skee-ball lane decks stop.
+  poolTable(15.4, -6.6, 0);
+  poolTable(15.4, -0.5, 0);
+  m.box(15.4, 3.2, -3.5, 2.6, 0.12, 2.6, '#e8e4d8', { solid: false, emis: 1.1 });
+  m.light(15.4, 3.0, -3.5, '#fff0c8', 0.9, 9);
 
   const airHockey = (x, z, yaw) => {
     m.box(x, 0.55, z, 2.6, 0.16, 1.5, '#0e2a3a', { yaw, tag: 'ice', emis: 0.5, rough: 0.15 });

@@ -168,7 +168,37 @@ async function main() {
     { label: 'chat delivery', timeout: 8000 }).catch(() => false);
     if (gotChat) pass('chat reaches the other client'); else fail('chat reaches the other client');
 
-    // 5. Start the match and walk it through prep into the hunt.
+    // 5. Invite by username. A separate context so the invitee has their own
+    // storage and their own handle, like an actual second person.
+    const otherCtx = await browser.newContext({ viewport: { width: 1000, height: 700 } });
+    const friend = await otherCtx.newPage();
+    watchPage(friend, 'friend', errors);
+    await friend.goto(`${BASE}/`, { waitUntil: 'domcontentloaded' });
+    await waitFor(async () => (await screenOn(friend)) === 'screen-menu', { label: 'friend menu' });
+    await friend.fill('#nameInput', 'FriendCham');
+    await friend.fill('#usernameInput', 'friendcham');
+    await friend.click('#saveNameBtn');
+    await sleep(900);
+
+    await host.fill('#lobbyInviteUser', 'friendcham');
+    await host.click('#lobbyInviteGo');
+    const gotInvite = await waitFor(async () =>
+      await friend.evaluate(() => !document.getElementById('invitePopup').classList.contains('hidden')),
+    { label: 'invite popup', timeout: 12000 }).catch(() => false);
+    if (gotInvite) {
+      pass('invite by username reaches the other player');
+      await friend.click('#inviteAccept');
+      const landed = await waitFor(async () =>
+        (await screenOn(friend)) === 'screen-lobby' && (await friend.textContent('#lobbyCode'))?.trim() === code,
+      { label: 'friend joins by invite', timeout: 15000 }).catch(() => false);
+      if (landed) pass('accepting the invite drops them into the room');
+      else fail('accepting the invite drops them into the room');
+    } else {
+      fail('invite by username reaches the other player');
+    }
+    await otherCtx.close();
+
+    // 6. Start the match and walk it through prep into the hunt.
     await host.click('#startBtn');
     await waitFor(async () => (await hudPhase(host)) === 'Hide', { label: 'prep phase', timeout: 40000 });
     pass('match started and reached the prep phase');
@@ -195,11 +225,37 @@ async function main() {
       pass('prep phase reached (host drew hunter, paint screen not applicable)', role);
     }
 
-    // 6. Movement is predicted and the server agrees.
-    const moved = await host.evaluate(async () => {
-      const before = window.__mcDebug?.pos();
-      return before ? [before.x, before.y, before.z] : null;
+    // 7. The player can actually move, and prediction agrees with the server.
+    const from = await host.evaluate(() => window.__mcDebug.pos());
+    await host.click('#scene', { position: { x: 640, y: 400 } }).catch(() => {});
+    await host.keyboard.down('KeyW');
+    await sleep(1800);
+    await host.keyboard.up('KeyW');
+    await sleep(700);
+    const to = await host.evaluate(() => window.__mcDebug.pos());
+    const dist = Math.hypot(to.x - from.x, to.z - from.z);
+    if (dist > 1.5) pass('walking moves the player', `${dist.toFixed(1)}m`);
+    else fail('walking moves the player', `only ${dist.toFixed(2)}m`);
+
+    // The server's own position for this player must agree with the client's
+    // prediction - a big gap means prediction and authority have diverged.
+    const drift = await host.evaluate(async () => {
+      const g = window.__mcDebug.game;
+      return new Promise((resolve) => {
+        const started = performance.now();
+        const tick = () => {
+          // me.p in the last snapshot is the authoritative position; the
+          // predicted one is game.me.pos.
+          if (performance.now() - started > 1500) resolve(null);
+          else setTimeout(() => resolve({ x: g.me.pos.x, y: g.me.pos.y, z: g.me.pos.z }), 400);
+        };
+        tick();
+      });
     });
+    const settled = await host.evaluate(() => window.__mcDebug.pos());
+    const wobble = drift ? Math.hypot(settled.x - drift.x, settled.z - drift.z) : 99;
+    if (wobble < 0.6) pass('prediction settles instead of rubber-banding', `${wobble.toFixed(2)}m drift at rest`);
+    else fail('prediction settles instead of rubber-banding', `${wobble.toFixed(2)}m drift at rest`);
 
     await waitFor(async () => (await hudPhase(host)) === 'Hunt', { label: 'hunt phase', timeout: 90000 });
     pass('round advanced from prep into the hunt');

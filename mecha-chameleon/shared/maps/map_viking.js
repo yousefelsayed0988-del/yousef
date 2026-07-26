@@ -331,8 +331,8 @@ export function build() {
     m.box(-10.6 + i * 0.27, 0.5, 12.16, 0.06, m.range(1.2, 1.8), 0.05, m.pick([RED, WOOL, GOLD]),
       { solid: false, jitter: 0.12 });
   }
-  m.table(-5.2, 9.4, 2.0, 0.9, 0.76, TIMBER_DK, { spot: false });
-  m.spot(-5.2, 0, 9.4, { stance: 'prone', quality: 0.7, hint: 'Under the work table' });
+  m.table(-1.5, 10.6, 2.0, 0.9, 0.76, TIMBER_DK, { spot: false });
+  m.spot(-1.5, 0, 10.6, { stance: 'prone', quality: 0.7, hint: 'Under the work table' });
   m.spot(-9.7, 0, 11.4, { stance: 'stand', quality: 0.74, hint: 'Behind the loom' });
 
   // Fur rugs scattered off the nave.

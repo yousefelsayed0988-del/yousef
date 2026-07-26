@@ -190,7 +190,7 @@ export function build() {
   }
   m.box(-20.2, DECK, -14.6, 4.6, 0.45, 0.5, WOOD, { tag: 'changeBench' });
   for (const s of [-1, 1]) m.box(-20.2 + s * 2.0, DECK, -14.6, 0.14, 0.45, 0.45, STEEL, { tag: 'benchLeg' });
-  m.spot(-20.2, DECK, -14.6, { stance: 'prone', quality: 0.62, hint: 'Flat on the changing bench' });
+  m.spot(-20.2, DECK + 0.45, -14.6, { stance: 'prone', quality: 0.62, hint: 'Flat on the changing bench' });
 
   const cubicle = (x, z, yaw) => {
     const a = yaw * DEG;
@@ -205,7 +205,7 @@ export function build() {
     m.spot(x, DECK, z, { stance: 'stand', quality: 0.82, hint: 'Behind a changing-cubicle curtain' });
   };
   for (let i = 0; i < 4; i++) cubicle(-23.2, 9.5 + i * 2.0, 90);
-  cubicle(-17.6, 15.0, 180);
+  cubicle(-22.0, 18.0, 180);
 
   // Showers along the west wall.
   for (let i = 0; i < 4; i++) {

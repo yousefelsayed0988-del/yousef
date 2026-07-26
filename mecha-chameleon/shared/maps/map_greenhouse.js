@@ -212,8 +212,10 @@ export function build() {
   potStack(-20.5, 12.8, 3, 0.44);
   potStack(9.4, -16.0, 4, 0.4);
   potStack(-2.4, -16.2, 4, 0.36);
-  m.spot(-20.8, 0, -13.2, { stance: 'crouch', quality: 0.78, hint: 'Between the pot stacks' });
-  m.spot(20.8, 0, -14.8, { stance: 'crouch', quality: 0.76, hint: 'Behind the terracotta tower' });
+  // Both sat close enough to a stack that the capsule climbed it instead of
+  // hiding behind it; these are in the floor gaps the towers leave.
+  m.spot(-20.5, 0, -13.6, { stance: 'crouch', quality: 0.78, hint: 'Between the pot stacks' });
+  m.spot(20.5, 0, -15.3, { stance: 'crouch', quality: 0.76, hint: 'Behind the terracotta tower' });
 
   // Loose pots and seed trays scattered on the ground.
   for (let i = 0; i < 16; i++) {

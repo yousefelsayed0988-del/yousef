@@ -275,6 +275,14 @@ function onPhaseChange(phase, previous) {
     case Phase.MATCH_END:
       audio.music('menu');
       break;
+    case Phase.LOBBY:
+      // The match wrapped up and the room went back to the lobby; follow it,
+      // otherwise the player is left staring at an empty map.
+      hud.objective('');
+      input.releaseLock();
+      if (ui.screen === 'play') ui.show('lobby');
+      audio.music('menu');
+      break;
     default:
       break;
   }

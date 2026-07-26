@@ -261,7 +261,7 @@ export function build() {
     m.box(cx, 2.6, 18.4, 0.55, 0.55, 0.06, m.pick([RED, BLUE, GREEN]), { solid: false, emis: 0.6, tag: 'laneNumber' });
   }
   m.spot(GX[0], 0, 18.7, { stance: 'crouch', quality: 0.58, hint: 'Ducked at the end of a checkout' });
-  m.spot(GX[3] + 0.62, 0, 13.6, { stance: 'crouch', quality: 0.6, hint: 'Behind the sweet rack' });
+  m.spot(GX[3] + 0.9, 0, 13.4, { stance: 'crouch', quality: 0.6, hint: 'Behind the sweet rack' });
   m.spot(GX[1] + 2.6, 0, 15.6, { stance: 'prone', quality: 0.62, hint: 'Flat in a closed lane' });
 
   // ------------------------------------------------------ trolleys + entrance --
@@ -303,8 +303,8 @@ export function build() {
     palletLoad(18.6 + i * 3.4, 2.93, -13.0, 0.8, m.pick([ORANGE, PURPLE, BLUE]));
   }
   for (const [px, pz] of [[18.2, -20.4], [26.4, -13.0]]) palletLoad(px, 0, pz, 1.1, m.pick([GREEN, YELLOW, PURPLE]));
-  m.spot(23.0, 0, -20.4, { stance: 'crouch', quality: 0.86, hint: 'Under the stockroom racking' });
-  m.spot(20.4, 0, -13.0, { stance: 'crouch', quality: 0.82, hint: 'Below the second rack bay' });
+  m.spot(23.0, 0, -19.5, { stance: 'crouch', quality: 0.86, hint: 'Tucked under the stockroom racking' });
+  m.spot(19.0, 0, -12.1, { stance: 'crouch', quality: 0.82, hint: 'Below the second rack bay' });
   m.crateStack(27.0, -16.8, WOOD, 3, 1.05);
   m.box(17.2, 0, -17.0, 1.0, 2.1, 2.6, STEEL_DK, { tag: 'compactor' });
   m.spot(17.2, 0, -18.7, { stance: 'stand', quality: 0.84, hint: 'Behind the compactor in the stockroom' });

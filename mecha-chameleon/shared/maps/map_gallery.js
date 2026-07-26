@@ -305,7 +305,7 @@ export function build() {
   m.box(-21.5, 0, 17.25, 9.0, 1.05, 0.14, WALL, { tag: 'counterFront' });
   for (const s of [-1, 1]) m.box(-21.5 + s * 4.43, 0, 17.0, 0.14, 1.05, 0.62, WALL, { tag: 'counterSide' });
   m.box(-21.5, 1.05, 17.0, 9.3, 0.09, 0.78, STONE, { tag: 'counterTop' });
-  m.pipe(-26.2, 1.85, 19.6, -17.0, 19.6, 0.05, BRASS);
+  m.pipe(-26.2, 1.85, 19.6, -17.0, 19.6, 0.05, BRASS, { solid: false });
   const COATS = ['#3a3f47', '#5a4232', '#2f3a4a', '#6b6257', A_RED, A_GREEN, '#41474e', A_BLUE,
     '#544a3f', '#33383e', A_PURPLE, '#5c5148'];
   for (let i = 0; i < COATS.length; i++) {
@@ -366,9 +366,9 @@ export function build() {
   // behind you is white, so only the canvas gives you something to become.
   m.spot(-26.9, 0, -18, { stance: 'crouch', quality: 0.72, hint: 'Under the big red canvas' });
   m.spot(-26.9, 0, 6, { stance: 'crouch', quality: 0.7, hint: 'Beside the purple field, west wall' });
-  m.spot(-19.7, 0, -6.5, { stance: 'stand', quality: 0.82, hint: 'Behind the orange panel' });
-  m.spot(-18.3, 0, -5.0, { stance: 'crouch', quality: 0.78, hint: 'Against the green panel face' });
-  m.spot(-17.5, 0, -8.0, { stance: 'prone', quality: 0.6, hint: 'Flat along the west bench' });
+  m.spot(-19.95, 0, -6.5, { stance: 'stand', quality: 0.82, hint: 'Behind the orange panel' });
+  m.spot(-18.1, 0, -5.0, { stance: 'crouch', quality: 0.78, hint: 'Against the green panel face' });
+  m.spot(-17.5, 0.52, -8.0, { stance: 'prone', quality: 0.6, hint: 'Flat along the west bench' });
   m.spot(-15.5, 0, -15.1, { stance: 'crouch', quality: 0.76, hint: 'Tight to the teal partition' });
   m.spot(-22.0, 0, 6.4, { stance: 'crouch', quality: 0.74, hint: 'Behind the purple standing panel' });
   m.spot(-24.0, 0, -13.1, { stance: 'crouch', quality: 0.66, hint: 'Low behind a plinth' });
@@ -380,7 +380,7 @@ export function build() {
   m.spot(18.8, 0, -4.0, { stance: 'crouch', quality: 0.78, hint: 'Against the yellow panel face' });
   m.spot(23.0, 0, 7.4, { stance: 'crouch', quality: 0.74, hint: 'Behind the green standing panel' });
   m.spot(13.9, 0, -16.5, { stance: 'crouch', quality: 0.8, hint: 'Wedged behind the orange panel' });
-  m.spot(17.5, 0, 4.5, { stance: 'prone', quality: 0.6, hint: 'Flat along the east bench' });
+  m.spot(17.5, 0.52, 4.5, { stance: 'prone', quality: 0.6, hint: 'Flat along the east bench' });
   m.spot(11.6, 0, -5.5, { stance: 'crouch', quality: 0.7, hint: 'Under the purple field on the partition' });
 
   m.spot(0, 0.5, -16.9, { stance: 'stand', quality: 0.8, hint: 'Behind the pink court panel' });
@@ -389,7 +389,7 @@ export function build() {
   m.spot(6, 0.5, -20.9, { stance: 'crouch', quality: 0.74, hint: 'Under the yellow canvas in the court' });
   m.spot(-6.4, 0.5, -9.9, { stance: 'prone', quality: 0.68, hint: 'Flat at the foot of the green field' });
 
-  m.spot(0, 0.9, 1.6, { stance: 'crouch', quality: 0.7, hint: 'On the dais, among the sculpture' });
+  m.spot(1.0, 0.9, 2.4, { stance: 'crouch', quality: 0.7, hint: 'On the dais, among the sculpture' });
   m.spot(-8.6, 0, 7.4, { stance: 'crouch', quality: 0.58, hint: 'Behind the teal vitrine' });
   m.spot(-9.1, 0, 10.1, { stance: 'crouch', quality: 0.72, hint: 'Under the orange field by the lobby door' });
 
@@ -397,7 +397,7 @@ export function build() {
   m.spot(-21.5, 0, 18.2, { stance: 'crouch', quality: 0.8, hint: 'Behind the coat-check counter' });
   m.spot(9.0, 0, 18.5, { stance: 'crouch', quality: 0.72, hint: 'Behind the ticket desk' });
   m.spot(-23.4, 0, 12.2, { stance: 'crouch', quality: 0.7, hint: 'Under the yellow field in the lobby' });
-  m.spot(-2.0, 0, 15.5, { stance: 'prone', quality: 0.58, hint: 'Flat on the lobby bench' });
+  m.spot(-2.0, 0.52, 15.5, { stance: 'prone', quality: 0.58, hint: 'Flat on the lobby bench' });
 
   // ---------------------------------------------------------------- lighting --
   m.light(0, 5.2, 1.0, '#ffffff', 1.25, 26);

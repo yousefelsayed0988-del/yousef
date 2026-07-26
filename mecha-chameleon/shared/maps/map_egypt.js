@@ -316,9 +316,15 @@ export function build() {
   // ----------------------------------------------------------- hall dressing --
   // Quarried blocks and rubble along both aisles, well clear of the walkways.
   for (let i = 0; i < 18; i++) {
-    const x = m.range(-8.6, 10.6);
+    let x = m.range(-8.6, 9.9);
     const z = m.chance(0.5) ? m.range(-13.2, -9.6) : m.range(9.6, 13.2);
-    m.box(x, 0, z, m.range(0.5, 1.5), m.range(0.35, 1.1), m.range(0.5, 1.4),
+    const w = m.range(0.5, 1.5);
+    // The outer column row runs straight down this aisle, so a block that
+    // landed on a base gets slid into the nearest gap instead of through it.
+    for (const cx of [-6, -1, 4, 9]) {
+      if (Math.abs(x - cx) < 1.35 + w / 2) { x = cx - 2.5; break; }
+    }
+    m.box(x, 0, z, w, m.range(0.35, 1.1), m.range(0.5, 1.4),
       m.pick([STONE, STONE_DK, SAND_DK, ROCK]), { yaw: m.range(-30, 30), jitter: 0.1, tag: 'block' });
   }
   m.crateStack(10.6, -12.8, SAND_DK, 3, 1.1, { spot: false });
@@ -348,8 +354,10 @@ export function build() {
     m.sphere(x, 1.42, z, 0.36, '#ff8a2e', { solid: false, emis: 2.8 });
     m.light(x, 1.6, z, '#ffa14a', 1.0, 11);
   };
-  brazier(-6, -5.5); brazier(-6, 5.5);
-  brazier(9, -5.5); brazier(9, 5.5);
+  // z = +-3.4, not +-5.5: the column row stands on +-5.5 and a brazier placed
+  // there ends up entirely inside a shaft.
+  brazier(-6, -3.4); brazier(-6, 3.4);
+  brazier(9, -3.4); brazier(9, 3.4);
   brazier(-12.6, 0);
   brazier(-18, -6.2); brazier(-18, 6.2);
   brazier(0, -15.4); brazier(0, 15.4);
