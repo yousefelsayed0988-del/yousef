@@ -7875,18 +7875,16 @@ function updateVillain(dt){
     if (lure) goal = { x: Math.floor(lure.x), y: Math.floor(lure.z) };
     else if (M.lastKnown) goal = M.lastKnown;
     else goal = null;
-    // standing on it and finding nothing is what starts a search
-    if (goal && Math.hypot(goal.x + 0.5 - V.x, goal.y + 0.5 - V.z) < 0.9){
-      if (lure && lure.kind === 'box'){
-        // he takes the music box apart, and it costs him
-        V.busy = 6.0;
-        smashLureAt(lure);
-      } else {
-        M.conf = Math.max(0, M.conf - 0.5);
-        M.frustration = clamp01(M.frustration + 0.18);
-        beginSweep(roomAtCell(goal.x, goal.y));
-        setVState('search');
-      }
+    /* Standing on it and finding nothing is what starts a search. A music
+       box is the exception: updateThrown owns that one - it sees him arrive,
+       holds him for six seconds and takes the box apart - so all he has to
+       do here is get there and let it happen to him. */
+    if (goal && Math.hypot(goal.x + 0.5 - V.x, goal.y + 0.5 - V.z) < 0.9 &&
+        !(lure && lure.kind === 'box')){
+      M.conf = Math.max(0, M.conf - 0.5);
+      M.frustration = clamp01(M.frustration + 0.18);
+      beginSweep(roomAtCell(goal.x, goal.y));
+      setVState('search');
     }
   } else if (V.state === 'check' && V.checkHide){
     goal = { x: Math.floor(V.checkHide.x), y: Math.floor(V.checkHide.z) };
@@ -8900,7 +8898,12 @@ function updateBoons(dt){
     if (BLOODTRAIL[i].life <= 0) BLOODTRAIL.splice(i, 1);
   }
 
-  if (V.busy > 0) V.busy = Math.max(0, V.busy - dt);
+  /* V.busy is counted down by updateVillain, which is the only thing that
+     knows what to do when it reaches zero - drop the padlock, open the door,
+     go back to listening. Counting it down here as well ran every stall at
+     half its written length, and whenever this call was the one that reached
+     zero first, updateVillain's completion block was skipped entirely: the
+     padlock never came off and he went back to hitting the same door forever. */
 }
 
 /* burning flares and a lit lantern, handed to the renderer as point lights */

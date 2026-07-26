@@ -365,6 +365,36 @@ const server = http.createServer((req, res) => {
       if (items.filter(i => i.live && i.type === 'boxSet').length) errs.push('a broken music box leaves its model behind');
     }
 
+    // 10f2. he must be able to walk to a music box through the AI's own
+    //       investigate path, hold on it, and come out the far side. This is
+    //       the path that used to call a function that had been deleted.
+    {
+      resume();
+      resetMind();
+      clearThrown();
+      P.boxes = 1;
+      const fl2 = [];
+      for (let gy = 1; gy < MH - 1; gy++) for (let gx = 1; gx < MW - 1; gx++)
+        if (!solid(gx, gy) && !doorAt(gx, gy)) fl2.push({ x: gx, y: gy });
+      P.x = fl2[0].x + 0.5; P.z = fl2[0].y + 0.5;
+      placeMusicBox();
+      for (const f of fl2) { const d = Math.hypot(f.x + .5 - P.x, f.y + .5 - P.z); if (d > 7 && d < 11) { V.x = f.x + .5; V.z = f.y + .5; break; } }
+      NOISE.level = 0; NOISE.src = 'player';
+      const st = {};
+      let held = 0;
+      for (let i = 0; i < 500; i++) {
+        P.alive = true; V.active = true;
+        try { updateThrown(0.05); updateBoons(0.05); updateVillain(0.05); }
+        catch (e) { errs.push('music-box approach: ' + e.message + ' @ ' + String(e.stack).split('\n')[1]); break; }
+        st[V.state] = (st[V.state] | 0) + 1;
+        if (V.busy > 0) held++;
+      }
+      log.push('music box approach: states ' + JSON.stringify(st) + ' held for ' + (held * 0.05).toFixed(1) + 's');
+      if (!st.smash) errs.push('he never reaches the music box through the investigate path');
+      if (held * 0.05 < 4) errs.push('the music box only held him ' + (held * 0.05).toFixed(1) + 's, it is written for 6');
+      clearThrown();
+    }
+
     // 10g. GPU resources must be handed back. A player who dies and retries
     //      sixty times in a session used to orphan twenty thousand VAOs.
     {
