@@ -63,7 +63,7 @@ const server = http.createServer((req, res) => {
 
   if (SETUP) {
     const r = await page.evaluate(src => { try { return String(eval(src)); } catch (e) { return 'EVAL ERROR: ' + e.message; } }, SETUP);
-    if (/EVAL ERROR/.test(r)) errors.push(r);
+    errors.push("EVAL: " + r);
     await page.waitForTimeout(700);
   }
 

@@ -2968,7 +2968,18 @@ GEO.loft = function(sections, seg, sub, capBot, capTop){
     const l = Math.hypot(nrm[i*3], nrm[i*3+1], nrm[i*3+2]) || 1;
     nrm[i*3]/=l; nrm[i*3+1]/=l; nrm[i*3+2]/=l;
   }
-  return { pos, nrm, uv, idx };
+  /* The swept shape written out as a distance function, sorted up the y
+     axis, so the skin pass can blend this tube into whatever it touches.
+     Only the centreline and the radii matter - the superellipse exponent
+     and the twist are close enough to a rounded section for a blend field. */
+  const sdfS = sections.map(q => [
+    q.y !== undefined ? q.y : 0,
+    q.cx !== undefined ? q.cx : 0,
+    q.cz !== undefined ? q.cz : 0,
+    Math.max(1e-4, q.rx !== undefined ? q.rx : 0.01),
+    Math.max(1e-4, q.rz !== undefined ? q.rz : 0.01)
+  ]).sort((a, b) => a[0] - b[0]);
+  return { pos, nrm, uv, idx, sdf: ['l', sdfS] };
 };
 
 /* A limb: rounded at both ends, with a muscle swell where it belongs. */
@@ -2994,7 +3005,9 @@ GEO.blob = function(rx, ry, rz, seg, rings){
     const a = y*(seg+1)+x, b = a+seg+1;
     idx.push(a, b, a+1, b, b+1, a+1);
   }
-  return { pos, nrm, uv, idx };
+  /* the same shape written as a distance function, so the skin pass can
+     melt this form into its neighbours instead of stacking on top of them */
+  return { pos, nrm, uv, idx, sdf: ['e', rx, ry, rz] };
 };
 
 GEO.limb = function(len, r0, r1, swellAt, swell, seg){
@@ -5502,6 +5515,14 @@ uniform vec4 uLightPos[6];   // xyz + range
 uniform vec3 uLightCol[6];
 uniform float uShadowOn;
 uniform float uShadowTexel;
+/* 1 for the house, 0 for the Lodger. He is one continuous closed surface
+   now rather than a heap of overlapping shells, and a body like that
+   shadows itself into a silhouette no matter how the bias is tuned - the
+   depth it stores IS the depth it then tests. He still casts: he is drawn
+   into the map, his shadow still comes round doorways ahead of him. He just
+   does not receive his own. What used to be read as contact shadow under
+   his jaw and his pauldron is carried by the relief and ambient terms. */
+uniform float uRecvShadow;
 uniform float uTimeS;
 /* per-material look: x bump strength, y specular power, z specular amount,
    w subsurface (how much light bleeds through flesh and cloth)            */
@@ -5655,7 +5676,7 @@ void main(){
   float atten = clamp(1.0 - dist / uFlashParams.z, 0.0, 1.0);
   atten *= atten;
   float ndl = max(dot(N, Ld), 0.0);
-  float sh = shadowFactor(Ng, Ld);
+  float sh = uRecvShadow > 0.5 ? shadowFactor(Ng, Ld) : 1.0;
   float torch = cone * atten * uFlashParams.w * sh;
   torch = torch / (1.0 + torch * 0.62);   // soft knee: nothing blows out up close
 
@@ -7146,11 +7167,373 @@ buildLodger = function(){
   return bones;
 };
 
+/* =========================================================================
+   THE SKIN, REBUILT AS A FIELD
+   -------------------------------------------------------------------------
+   Up to here the Lodger's body was about two hundred separate ellipsoids and
+   lofted tubes stacked on top of one another - a pectoral was a disc laid on
+   a ribcage, a deltoid was a ball set on an arm. However carefully they are
+   placed, you can see where one stops and the next starts, and no amount of
+   adding more of them fixes that, because the seam IS the technique.
+
+   So this is a different technique. Every one of those forms is re-read as a
+   signed distance function, all of them are unioned with a polynomial smooth
+   minimum - which makes them grow into each other rather than intersect -
+   and the result is polygonised into ONE continuous skin with surface nets.
+   Normals come off the analytic gradient of the field, so they are smoother
+   than anything that can be averaged out of triangles.
+
+   A deltoid stops being a ball on an arm and becomes a shoulder.
+
+   The bones, the animation, the kit, the blades and the teeth are untouched:
+   only the flesh is remade, and it is handed back to the same bones it came
+   off, so everything downstream carries on as before.
+   ========================================================================= */
+
+/* ---- 1. the field ----------------------------------------------------- */
+
+function sdSmin(a, b, k){
+  if (k <= 0) return a < b ? a : b;
+  const h = Math.max(0, k - Math.abs(a - b)) / k;
+  return (a < b ? a : b) - h * h * k * 0.25;
+}
+
+function sdEllipsoidAt(px, py, pz, c, r){
+  const x = px - c[0], y = py - c[1], z = pz - c[2];
+  const ax = x / r[0], ay = y / r[1], az = z / r[2];
+  const k0 = Math.sqrt(ax*ax + ay*ay + az*az);
+  if (k0 < 1e-6) return -Math.min(r[0], r[1], r[2]);
+  const bx = ax / r[0], by = ay / r[1], bz = az / r[2];
+  const k1 = Math.sqrt(bx*bx + by*by + bz*bz);
+  return k0 * (k0 - 1) / k1;
+}
+
+/* A lofted tube. Every loft in this rig is swept along y with the radii and
+   the centreline given per section, so the distance is the ellipse distance
+   in the xz plane at that height, intersected with the y slab. */
+function sdLoftAt(px, py, pz, S, c){
+  const x = px - c[0], y = py - c[1], z = pz - c[2];
+  const n = S.length;
+  const y0 = S[0][0], y1 = S[n-1][0];
+  let cx, cz, rx, rz;
+  if (y <= y0){ cx = S[0][1]; cz = S[0][2]; rx = S[0][3]; rz = S[0][4]; }
+  else if (y >= y1){ cx = S[n-1][1]; cz = S[n-1][2]; rx = S[n-1][3]; rz = S[n-1][4]; }
+  else {
+    let i = 0;
+    while (i < n - 2 && S[i+1][0] < y) i++;
+    const a = S[i], b = S[i+1];
+    const t = (y - a[0]) / ((b[0] - a[0]) || 1);
+    cx = a[1] + (b[1]-a[1])*t; cz = a[2] + (b[2]-a[2])*t;
+    rx = a[3] + (b[3]-a[3])*t; rz = a[4] + (b[4]-a[4])*t;
+  }
+  if (rx < 1e-5) rx = 1e-5;
+  if (rz < 1e-5) rz = 1e-5;
+  const ex = (x - cx) / rx, ez = (z - cz) / rz;
+  const rad = (Math.sqrt(ex*ex + ez*ez) - 1) * Math.min(rx, rz);
+  const slab = Math.max(y0 - y, y - y1);
+  if (rad <= 0 && slab <= 0) return Math.max(rad, slab);
+  const a2 = Math.max(rad, 0), b2 = Math.max(slab, 0);
+  return Math.sqrt(a2*a2 + b2*b2) + Math.min(Math.max(rad, slab), 0);
+}
+
+/* ---- 2. surface nets -------------------------------------------------- */
+
+const SN_CUBE = [[0,0,0],[1,0,0],[1,1,0],[0,1,0],[0,0,1],[1,0,1],[1,1,1],[0,1,1]];
+const SN_EDGE = [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+
+function surfaceNets(field, min, max, res){
+  const nx = res[0], ny = res[1], nz = res[2];
+  const dx = (max[0]-min[0])/nx, dy = (max[1]-min[1])/ny, dz = (max[2]-min[2])/nz;
+  const gw = nx+1, gh = ny+1, gd = nz+1;
+  const g = new Float32Array(gw*gh*gd);
+  let p = 0;
+  for (let k = 0; k < gd; k++){
+    const z = min[2] + k*dz;
+    for (let j = 0; j < gh; j++){
+      const y = min[1] + j*dy;
+      for (let i = 0; i < gw; i++) g[p++] = field(min[0] + i*dx, y, z);
+    }
+  }
+  const at = (a,b,c) => g[(c*gh + b)*gw + a];
+
+  const cellIndex = new Int32Array(nx*ny*nz).fill(-1);
+  const pos = [], nrm = [];
+  const v = new Float64Array(8);
+  for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++){
+    let neg = 0;
+    for (let c = 0; c < 8; c++){
+      const d = at(i + SN_CUBE[c][0], j + SN_CUBE[c][1], k + SN_CUBE[c][2]);
+      v[c] = d; if (d < 0) neg++;
+    }
+    if (neg === 0 || neg === 8) continue;
+    let sx = 0, sy = 0, sz = 0, n = 0;
+    for (let e = 0; e < 12; e++){
+      const a = SN_EDGE[e][0], b = SN_EDGE[e][1];
+      const da = v[a], db = v[b];
+      if ((da < 0) === (db < 0)) continue;
+      const t = da / (da - db);
+      sx += SN_CUBE[a][0] + (SN_CUBE[b][0]-SN_CUBE[a][0])*t;
+      sy += SN_CUBE[a][1] + (SN_CUBE[b][1]-SN_CUBE[a][1])*t;
+      sz += SN_CUBE[a][2] + (SN_CUBE[b][2]-SN_CUBE[a][2])*t;
+      n++;
+    }
+    cellIndex[(k*ny + j)*nx + i] = pos.length/3;
+    pos.push(min[0] + (i + sx/n)*dx, min[1] + (j + sy/n)*dy, min[2] + (k + sz/n)*dz);
+    /* the gradient straight off this cell's eight corners. Sampling the
+       field six more times per vertex for an analytic gradient cost more
+       than the whole rest of the mesher put together, and at this voxel
+       size the cell gradient is indistinguishable. */
+    let gx = (v[1]+v[2]+v[5]+v[6]) - (v[0]+v[3]+v[4]+v[7]);
+    let gy = (v[2]+v[3]+v[6]+v[7]) - (v[0]+v[1]+v[4]+v[5]);
+    let gz = (v[4]+v[5]+v[6]+v[7]) - (v[0]+v[1]+v[2]+v[3]);
+    gx /= dx; gy /= dy; gz /= dz;
+    /* Negated. The gradient of a distance field points OUT of the surface,
+       which is the textbook normal - but every lofted body part in this rig
+       carries a winding-derived normal that points the other way, and the
+       renderer is built around that. Handing it an outward normal makes the
+       whole body come back unlit and, worse, drives the shadow normal-offset
+       the wrong way so it self-shadows into the bargain. */
+    const gl = -(Math.hypot(gx, gy, gz) || 1);
+    nrm.push(gx/gl, gy/gl, gz/gl);
+  }
+
+  const idx = [];
+  const cell = (a,b,c) => (a<0||b<0||c<0||a>=nx||b>=ny||c>=nz) ? -1 : cellIndex[(c*ny + b)*nx + a];
+  /* Wound the way the rest of the engine winds. Every primitive in this game
+     comes out with a negative signed volume and the renderer is built round
+     that, so the textbook winding would hand back a body inside out. */
+  const quad = (q0,q1,q2,q3,flip) => {
+    if (q0<0||q1<0||q2<0||q3<0) return;
+    if (flip) idx.push(q0,q2,q1, q0,q3,q2); else idx.push(q0,q1,q2, q0,q2,q3);
+  };
+  for (let k = 0; k < gd; k++) for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++){
+    const d0 = at(i,j,k);
+    if (i < nx && (d0 < 0) !== (at(i+1,j,k) < 0))
+      quad(cell(i,j-1,k-1), cell(i,j,k-1), cell(i,j,k), cell(i,j-1,k), d0 < 0);
+    if (j < ny && (d0 < 0) !== (at(i,j+1,k) < 0))
+      quad(cell(i-1,j,k-1), cell(i,j,k-1), cell(i,j,k), cell(i-1,j,k), d0 >= 0);
+    if (k < nz && (d0 < 0) !== (at(i,j,k+1) < 0))
+      quad(cell(i-1,j-1,k), cell(i,j-1,k), cell(i,j,k), cell(i-1,j,k), d0 < 0);
+  }
+
+  return { pos, nrm, idx };
+}
+
+/* ---- 3. reading the rig back out as a field --------------------------- */
+
+/* the rest world transform of a bone: its own offsets, and its parents', with
+   every joint at zero rotation */
+function restWorld(bones, name){
+  let x = 0, y = 0, z = 0, b = bones[name];
+  while (b){ x += b.off[0]; y += b.off[1]; z += b.off[2]; b = b.parent ? bones[b.parent] : null; }
+  return [x, y, z];
+}
+
+/* Which bones get remade as field, and how finely. Hands, feet and every
+   piece of kit stay as they are - they are hard-surface, they have no seam
+   problem, and melting a boot into a shin would help nobody. */
+const SDF_BONES = {
+  head:      { vox: 0.0052, pad: 0.055 },
+  neck:      { vox: 0.0070, pad: 0.060 },
+  chest:     { vox: 0.0080, pad: 0.070 },
+  spine:     { vox: 0.0080, pad: 0.070 },
+  pelvis:    { vox: 0.0085, pad: 0.060 },
+  shoulderL: { vox: 0.0068, pad: 0.055 }, shoulderR: { vox: 0.0068, pad: 0.055 },
+  upperArmL: { vox: 0.0068, pad: 0.055 }, upperArmR: { vox: 0.0068, pad: 0.055 },
+  foreArmL:  { vox: 0.0065, pad: 0.050 }, foreArmR:  { vox: 0.0065, pad: 0.050 },
+  thighL:    { vox: 0.0080, pad: 0.055 }, thighR:    { vox: 0.0080, pad: 0.055 },
+  shinL:     { vox: 0.0075, pad: 0.050 }, shinR:     { vox: 0.0075, pad: 0.050 }
+};
+
+/* how far the forms blend into each other, in metres. Big enough that a
+   pectoral fairs into a ribcage, small enough that an abdominal block is
+   still an abdominal block. */
+const SDF_BLEND = 0.034;
+
+/* 1.0 is the authored voxel size. Higher numbers are coarser and faster. */
+let SDF_VOX_SCALE = 1.0;
+function sdfVoxScale(){ return [1.9, 1.55, 1.25, 1.0, 0.88][S.q] || 1.15; }
+
+function buildSdfSkin(bones){
+  const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+
+  /* collect every piece of flesh in the rig, in rest world space, keeping
+     which bone it came off so the result can be handed back */
+  const forms = [];
+  for (const name in bones){
+    const b = bones[name];
+    const base = restWorld(bones, name);
+    for (const m of b.meshes){
+      if (m.tex !== 'orcSkin' || !m.prim || !m.prim.sdf) continue;
+      const t = m.mat;
+      const c = [base[0] + (t ? t[12] : 0), base[1] + (t ? t[13] : 0), base[2] + (t ? t[14] : 0)];
+      forms.push({ bone: name, sdf: m.prim.sdf, c: c, mesh: m });
+    }
+  }
+  if (forms.length < 8) return null;             // nothing to work with - leave the rig alone
+
+  // a bounding sphere per form, so a box can throw away what it cannot reach
+  for (const f of forms){
+    const s = f.sdf;
+    f.r = (s[0] === 'e') ? Math.max(s[1], s[2], s[3])
+        : Math.max(Math.abs(s[1][0][0]), Math.abs(s[1][s[1].length-1][0])) +
+          Math.max.apply(null, s[1].map(q => Math.max(q[3], q[4])));
+  }
+
+  const evalForm = (f, x, y, z) =>
+    f.sdf[0] === 'e' ? sdEllipsoidAt(x, y, z, f.c, [f.sdf[1], f.sdf[2], f.sdf[3]])
+                     : sdLoftAt(x, y, z, f.sdf[1], f.c);
+
+  let totalVerts = 0, totalTris = 0, meshed = 0;
+
+  for (const name in SDF_BONES){
+    const bone = bones[name];
+    if (!bone) continue;
+    const cfg = SDF_BONES[name];
+    const mine = forms.filter(f => f.bone === name);
+    if (!mine.length) continue;
+
+    // the box this bone's own flesh occupies, plus room for the blend
+    const lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
+    for (const f of mine){
+      const s = f.sdf;
+      let ex, ey, ez;
+      if (s[0] === 'e'){ ex = s[1]; ey = s[2]; ez = s[3]; }
+      else {
+        ex = ez = 0; ey = 0;
+        for (const q of s[1]){
+          ex = Math.max(ex, Math.abs(q[1]) + q[3]);
+          ez = Math.max(ez, Math.abs(q[2]) + q[4]);
+          ey = Math.max(ey, Math.abs(q[0]));
+        }
+      }
+      lo[0] = Math.min(lo[0], f.c[0]-ex); hi[0] = Math.max(hi[0], f.c[0]+ex);
+      lo[1] = Math.min(lo[1], f.c[1]-ey); hi[1] = Math.max(hi[1], f.c[1]+ey);
+      lo[2] = Math.min(lo[2], f.c[2]-ez); hi[2] = Math.max(hi[2], f.c[2]+ez);
+    }
+    for (let i = 0; i < 3; i++){ lo[i] -= cfg.pad; hi[i] += cfg.pad; }
+
+    // only the forms that can reach into this box get evaluated in it
+    const near = forms.filter(f => {
+      const reach = f.r + SDF_BLEND * 2;
+      return f.c[0] > lo[0]-reach && f.c[0] < hi[0]+reach &&
+             f.c[1] > lo[1]-reach && f.c[1] < hi[1]+reach &&
+             f.c[2] > lo[2]-reach && f.c[2] < hi[2]+reach;
+    });
+    if (!near.length) continue;
+
+    /* Biggest first, so the running distance drops fast and the cull below
+       throws away as much as possible as early as possible. */
+    near.sort((a, b) => b.r - a.r);
+    const NC = near.length;
+    const cx = new Float64Array(NC), cy = new Float64Array(NC), cz = new Float64Array(NC),
+          cr = new Float64Array(NC);
+    for (let i = 0; i < NC; i++){ cx[i] = near[i].c[0]; cy[i] = near[i].c[1]; cz[i] = near[i].c[2]; cr[i] = near[i].r; }
+
+    /* The whole cost of this pass is here - it runs once per grid point, and
+       there are a few hundred thousand of them per bone. `distance to the
+       form's bounding sphere` is a true lower bound on the form's distance,
+       so anything whose lower bound is already further away than the running
+       minimum plus the blend radius cannot change the answer and never gets
+       evaluated properly. That turns a full sweep of every form into a
+       handful of real evaluations per point. */
+    const field = (x, y, z) => {
+      let d = 1e9;
+      for (let i = 0; i < NC; i++){
+        const ddx = x - cx[i], ddy = y - cy[i], ddz = z - cz[i];
+        const lb = Math.sqrt(ddx*ddx + ddy*ddy + ddz*ddz) - cr[i];
+        if (lb > d + SDF_BLEND) continue;
+        d = sdSmin(d, evalForm(near[i], x, y, z), SDF_BLEND);
+      }
+      return d;
+    };
+
+    /* Voxel size follows the quality preset. Low keeps the old primitive
+       body entirely (see the guard in buildVillain); everything above it
+       gets the field, finer the higher you go. */
+    const vox = cfg.vox * SDF_VOX_SCALE;
+    const res = [
+      Math.max(6, Math.min(120, Math.ceil((hi[0]-lo[0]) / vox))),
+      Math.max(6, Math.min(150, Math.ceil((hi[1]-lo[1]) / vox))),
+      Math.max(6, Math.min(120, Math.ceil((hi[2]-lo[2]) / vox)))
+    ];
+    const out = surfaceNets(field, lo, hi, res);
+    if (!out.pos.length) continue;
+
+    /* Keep only what is nearer to this bone's own flesh than to anyone
+       else's, with a margin so neighbouring chunks overlap at the joints
+       rather than opening a gap when he bends. */
+    const ownerOf = (x, y, z) => {
+      let bestOwn = 1e9, bestOther = 1e9;
+      for (let i = 0; i < near.length; i++){
+        const f = near[i];
+        // the vertex is on the surface, so anything whose bounding sphere
+        // is not within reach of it cannot be the nearest form
+        const ddx = x - f.c[0], ddy = y - f.c[1], ddz = z - f.c[2];
+        const reach = f.r + 0.14;
+        if (ddx*ddx + ddy*ddy + ddz*ddz > reach*reach) continue;
+        const d = evalForm(f, x, y, z);
+        if (f.bone === name){ if (d < bestOwn) bestOwn = d; }
+        else if (d < bestOther) bestOther = d;
+      }
+      return bestOwn - 0.045 <= bestOther;
+    };
+    const nv = out.pos.length / 3;
+    const keepV = new Uint8Array(nv);
+    for (let i = 0; i < nv; i++)
+      keepV[i] = ownerOf(out.pos[i*3], out.pos[i*3+1], out.pos[i*3+2]) ? 1 : 0;
+
+    const boneBase = restWorld(bones, name);   // once, not once per vertex
+    const remap = new Int32Array(nv).fill(-1);
+    const pos = [], nrm = [], uv = [];
+    const keptIdx = [];
+    for (let i = 0; i < out.idx.length; i += 3){
+      const a = out.idx[i], b = out.idx[i+1], c = out.idx[i+2];
+      if (!keepV[a] && !keepV[b] && !keepV[c]) continue;
+      for (const q of [a, b, c]){
+        if (remap[q] < 0){
+          remap[q] = pos.length/3;
+          pos.push(out.pos[q*3] - boneBase[0], out.pos[q*3+1] - boneBase[1], out.pos[q*3+2] - boneBase[2]);
+          nrm.push(out.nrm[q*3], out.nrm[q*3+1], out.nrm[q*3+2]);
+          /* Cylindrical UVs about his own axis, seam put round the back.
+             Skin is a noise map, so a little stretch at the poles costs
+             nothing and this keeps the one visible seam behind him. */
+          const wx = out.pos[q*3], wy = out.pos[q*3+1], wz = out.pos[q*3+2];
+          let u = Math.atan2(wx, -wz) / (Math.PI*2) + 0.5;
+          uv.push(u * 2.2, wy * 1.9);
+        }
+        keptIdx.push(remap[q]);
+      }
+    }
+    if (!keptIdx.length) continue;
+
+    // the flesh this bone used to be made of goes; everything else stays
+    bone.meshes = bone.meshes.filter(m => !(m.tex === 'orcSkin' && m.prim && m.prim.sdf));
+    bone.meshes.push({ tex: 'orcSkin', prim: {
+      pos: pos, nrm: nrm, uv: uv, idx: keptIdx
+    }, mat: null });
+
+    totalVerts += pos.length/3; totalTris += keptIdx.length/3; meshed++;
+  }
+
+  const ms = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0);
+  window.__SDFSKIN__ = { bones: meshed, verts: totalVerts, tris: totalTris, ms: ms, forms: forms.length };
+  return window.__SDFSKIN__;
+}
+
+
 function buildVillain(){
   // his rig is rebuilt on a quality change, not on a new night
   freeMeshes('lodger');
   MESH_OWNER = 'lodger';
   V.bones = buildLodger();
+  /* and then his flesh is thrown away and remade as one continuous surface.
+     If the field pass cannot find enough to work with it returns null and the
+     primitives it would have replaced are still sitting there, so the worst
+     case is the body he had before. */
+  SDF_VOX_SCALE = sdfVoxScale();
+  try { if (S.q >= 1) buildSdfSkin(V.bones); else window.__SDFSKIN__ = { skipped: 'quality' }; }
+  catch (e){ window.__SDFSKIN__ = { error: String(e && e.message || e) }; }
   for (const n in V.bones){
     const b = V.bones[n];
     b.gpu = b.meshes.length ? compileModel(b.meshes) : [];
@@ -10000,6 +10383,7 @@ function eachDrawable(cb){
      across the frame the way they should. */
   if (V.active && V.bones){
     const t = performance.now() / 1000;
+    // 5th argument: do not let him receive his own shadow
     let ember = 1.35 + (V.rage || 0) * 1.5;
     if (V.state === 'hunt' || V.state === 'lunge') ember += 1.6;
     else if (V.state === 'roar') ember += 3.2;
@@ -10010,7 +10394,7 @@ function eachDrawable(cb){
     for (const n in V.bones){
       const b = V.bones[n];
       for (const part of b.gpu)
-        cb(part.mesh, b.world, part.tex, part.tex === 'emberEye' ? part.glow * ember : part.glow);
+        cb(part.mesh, b.world, part.tex, part.tex === 'emberEye' ? part.glow * ember : part.glow, 1);
     }
   }
 }
@@ -10089,11 +10473,16 @@ function matParams(tex){
 }
 
 function drawScene(prog, depthOnly){
-  let lastTex = null;
+  let lastTex = null, lastRecv = -1;
   const hasMat = !depthOnly && prog.u.uMat !== undefined && prog.u.uMat !== null;
-  eachDrawable((mesh, model, tex, glow) => {
+  eachDrawable((mesh, model, tex, glow, noShadow) => {
     gl.uniformMatrix4fv(prog.u.uModel, false, model);
     if (!depthOnly){
+      const recv = noShadow ? 0 : 1;
+      if (recv !== lastRecv && prog.u.uRecvShadow !== undefined && prog.u.uRecvShadow !== null){
+        gl.uniform1f(prog.u.uRecvShadow, recv);
+        lastRecv = recv;
+      }
       if (tex !== lastTex){
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, TX[tex] || TX.concrete);
