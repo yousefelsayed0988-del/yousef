@@ -3127,9 +3127,9 @@ function buildLodger(){
   /* ================= torso: bare, and built like a door ================ */
   add('spine', 'pelvis', 0, 0.14, 0, [
     { tex: SK, prim: GEO.loft([
-        { y: 0.00, rx: 0.156, rz: 0.116, k: 2.6 },
-        { y: 0.10, rx: 0.170, rz: 0.124, k: 2.6 },
-        { y: 0.20, rx: 0.192, rz: 0.134, k: 2.6 },
+        { y: 0.00, rx: 0.128, rz: 0.104, k: 2.5 },
+        { y: 0.10, rx: 0.146, rz: 0.114, k: 2.6 },
+        { y: 0.20, rx: 0.180, rz: 0.130, k: 2.6 },
         { y: 0.29, rx: 0.214, rz: 0.146, k: 2.6 }
       ], 30, 6, false, false), mat: I },
     // the abdominal wall: two columns of three
@@ -3139,20 +3139,33 @@ function buildLodger(){
     // the linea alba between them
     { tex: SK, prim: GEO.blob(0.010, 0.130, 0.016, 12, 10), mat: mat(0, 0.150, 0.122) },
     // obliques
-    ...[-1, 1].map(s => ({ tex: SK, prim: GEO.blob(0.030, 0.086, 0.048, 16, 12),
-      mat: mat(s*0.152, 0.150, 0.052, 0, 0, s*0.18) }))
+    ...[-1, 1].map(s => ({ tex: SK, prim: GEO.blob(0.028, 0.086, 0.046, 16, 12),
+      mat: mat(s*0.138, 0.150, 0.050, 0, 0, s*0.22) }))
   ]);
 
   add('chest', 'spine', 0, 0.29, 0, [
     // the rib cage / lat spread
     { tex: SK, prim: GEO.loft([
-        { y: 0.00, rx: 0.214, rz: 0.146, k: 2.6 },
-        { y: 0.10, rx: 0.244, rz: 0.158, k: 2.6 },
-        { y: 0.22, rx: 0.268, rz: 0.168, k: 2.7 },
-        { y: 0.32, rx: 0.262, rz: 0.162, k: 2.8 },
-        { y: 0.39, rx: 0.222, rz: 0.144, k: 2.6 },
+        { y: 0.00, rx: 0.208, rz: 0.144, k: 2.6 },
+        { y: 0.10, rx: 0.248, rz: 0.158, k: 2.6 },
+        { y: 0.22, rx: 0.286, rz: 0.170, k: 2.7 },
+        { y: 0.32, rx: 0.278, rz: 0.164, k: 2.8 },
+        { y: 0.39, rx: 0.226, rz: 0.146, k: 2.6 },
         { y: 0.43, rx: 0.140, rz: 0.108, k: 2.4 }
       ], 30, 6, false, true), mat: I },
+    /* the lat wings: from under the armpit, out and then hard in to the
+       waist. Without them the widened rib cage is just a fatter barrel. */
+    ...[-1, 1].map(s => ({ tex: SK, prim: GEO.loft([
+        { y: 0.300, cx: s*0.196, cz: -0.010, rx: 0.052, rz: 0.086, k: 2.4 },
+        { y: 0.210, cx: s*0.226, cz: -0.014, rx: 0.062, rz: 0.104, k: 2.5 },
+        { y: 0.110, cx: s*0.206, cz: -0.010, rx: 0.052, rz: 0.098, k: 2.6 },
+        { y: 0.020, cx: s*0.156, cz:  0.000, rx: 0.034, rz: 0.076, k: 2.6 },
+        { y: -0.040, cx: s*0.120, cz: 0.006, rx: 0.018, rz: 0.052, k: 2.6 }
+      ], 16, 5, true, true), mat: I })),
+    // the serratus fingers under them, where the lat meets the ribs
+    ...[-1, 1].flatMap(s => [0, 1, 2].map(i => ({ tex: SK,
+      prim: GEO.blob(0.030 - i*0.004, 0.016, 0.038, 12, 9),
+      mat: mat(s*(0.176 - i*0.012), 0.130 - i*0.052, 0.052 + i*0.010, 0, 0, s*0.34) }))),
     // pectorals
     { tex: SK, prim: GEO.blob(0.112, 0.070, 0.058, 22, 16), mat: mat(-0.104, 0.278, 0.118, -0.12, 0.16, 0.10) },
     { tex: SK, prim: GEO.blob(0.112, 0.070, 0.058, 22, 16), mat: mat( 0.104, 0.278, 0.118, -0.12,-0.16,-0.10) },
