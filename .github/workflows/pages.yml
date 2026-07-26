@@ -1,0 +1,48 @@
+# Publish the game to GitHub Pages.
+#
+# Pages is static hosting, so this is the single-player build: the world, mobs,
+# villagers, crafting and saves all work, but online play needs a host running
+# proxy.py or serve.mjs and is unavailable here.
+#
+# orebound/ is uploaded as the site root, so the game lands at the site URL
+# itself rather than a /orebound/ subpath.
+name: Deploy Orebound to Pages
+
+on:
+  push:
+    branches: [claude/voxel-survival-game-4dijsw]
+    paths:
+      - 'orebound/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # enablement: true turns Pages on if it has never been switched on,
+      # so there is nothing to click in the repository settings.
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: orebound
+
+      - id: deploy
+        uses: actions/deploy-pages@v4

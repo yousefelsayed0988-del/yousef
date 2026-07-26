@@ -155,7 +155,7 @@ const probes = await page.evaluate(async () => {
   const w = g.world;
   const out = {};
 
-  const { blockId, BLOCKS } = await import('/src/core/blocks.js');
+  const { blockId, BLOCKS } = await import(new URL('src/core/blocks.js', location.href).href);
   const STONE = blockId('stone'), TORCH = blockId('torch'), AIR = blockId('air');
 
   // --- place and break a block, and check lighting reacts to a torch
@@ -182,8 +182,8 @@ const probes = await page.evaluate(async () => {
   out.lightBefore = lightBefore;
 
   // --- crafting: 1 log -> 4 planks via the real recipe matcher
-  const { findRecipe } = await import('/src/core/recipes.js');
-  const { itemByName } = await import('/src/core/items.js');
+  const { findRecipe } = await import(new URL('src/core/recipes.js', location.href).href);
+  const { itemByName } = await import(new URL('src/core/items.js', location.href).href);
   const log = itemByName('oak_log');
   const grid = [{ id: log.id, count: 1, dmg: 0 }, null, null, null];
   const r = findRecipe(grid, 2, 2);
@@ -194,16 +194,16 @@ const probes = await page.evaluate(async () => {
   const P = { id: planks.id, count: 1, dmg: 0 }, S = { id: stick.id, count: 1, dmg: 0 };
   const g3 = [P, P, P, null, S, null, null, S, null];
   const r3 = findRecipe(g3, 3, 3);
-  out.craftPickaxe = !!r3 && (await import('/src/core/items.js')).item(r3.result.id).name === 'wooden_pickaxe';
+  out.craftPickaxe = !!r3 && (await import(new URL('src/core/items.js', location.href).href)).item(r3.result.id).name === 'wooden_pickaxe';
 
   // --- smelting table
-  const { smeltResult, fuelTicks } = await import('/src/core/recipes.js');
+  const { smeltResult, fuelTicks } = await import(new URL('src/core/recipes.js', location.href).href);
   out.smeltIron = !!smeltResult(itemByName('raw_iron').id);
   out.coalIsFuel = fuelTicks(itemByName('coal').id) === 1600;
   out.plankFuel = fuelTicks(planks.id) === 300;
 
   // --- tags
-  const { tagItems } = await import('/src/core/tags.js');
+  const { tagItems } = await import(new URL('src/core/tags.js', location.href).href);
   out.tagPlanks = tagItems('#planks').size === 7;
   out.tagCoals = tagItems('#coals').size === 2;
 
@@ -214,7 +214,7 @@ const probes = await page.evaluate(async () => {
   out.saveRoundTrip = parsed.seed === w.seed && Math.abs(parsed.player.x - g.player.x) < 0.001;
 
   // --- inventory
-  const { mkStack } = await import('/src/items/inventory.js');
+  const { mkStack } = await import(new URL('src/items/inventory.js', location.href).href);
   g.player.inventory.pickUp(mkStack(itemByName('oak_log').id, 12));
   out.pickedUp = g.player.inventory.count(itemByName('oak_log').id) >= 12;
 
@@ -270,7 +270,7 @@ const probes = await page.evaluate(async () => {
   out.biomeVariety = biomes.size;
 
   // --- mob spawn machinery
-  const { Mob } = await import('/src/entities/entities.js');
+  const { Mob } = await import(new URL('src/entities/entities.js', location.href).href);
   const m = new Mob(w, 'zombie', g.player.x + 3, w.topSolid(px + 3, pz) + 1, g.player.z);
   w.entities.push(m);
   out.mobSpawned = !!m.def;
