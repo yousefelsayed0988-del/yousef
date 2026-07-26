@@ -95,6 +95,7 @@ let animT = 0;
 let lastFrame = performance.now() / 1000;
 let fpsAccum = 0, fpsFrames = 0, fps = 0;
 let previewMode = false;
+let greeted = false;
 
 // ---------------------------------------------------------------- helpers --
 function setMap(mapId) {
@@ -127,7 +128,6 @@ function connect() {
     ui.netStatus(s.connected, s.rtt);
     if (s.connected) {
       ui.bootStatus('Connected');
-      if (ui.screen === 'boot') afterConnect();
     } else if (ui.screen !== 'boot') {
       ui.toast('Lost the connection. Reconnecting…', 'warn');
     }
@@ -142,6 +142,7 @@ function connect() {
     ui.setIdentity(msg.name, msg.username);
     store.set('mc.name', msg.name);
     store.set('mc.username', msg.username);
+    if (!greeted) { greeted = true; afterConnect(); }
   });
 
   net.on(S2C.ERROR, (msg) => {
@@ -685,7 +686,6 @@ function blendHint() {
 
 // -------------------------------------------------------------- game API --
 Object.assign(game, {
-  get input() { return input; },
   sendPaint() {
     net.send(C2S.PAINT, { paint: game.paint });
     audio.play('paint');
@@ -844,6 +844,7 @@ async function boot() {
   }
 
   input = createInput(canvas);
+  game.input = input;
   audio = createAudio();
   audio.setVolume(settings.volumes.master, settings.volumes.sfx, settings.volumes.music);
   ui = createUI(game);

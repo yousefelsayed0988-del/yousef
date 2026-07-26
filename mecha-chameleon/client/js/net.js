@@ -59,12 +59,14 @@ export function createNet(opts = {}) {
       state.connecting = false;
       state.lastError = null;
       backoff = 500;
-      fire('status', { ...state });
+      // Hello goes out before anything else hears about the connection: the
+      // server rejects every other message until it has one.
       send(C2S.HELLO, {
         v: VERSION,
         name: opts.name?.() || 'Chameleon',
         username: opts.username?.() || '',
       });
+      fire('status', { ...state });
       startPing();
     };
 
