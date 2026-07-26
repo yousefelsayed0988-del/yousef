@@ -347,7 +347,7 @@ export function build() {
   m.light(-14, 4.4, -4, '#7fa8c8', 0.22, 7);
 
   // ------------------------------------------------------------------ spawns --
-  m.spawnHider(-22.0, -17.6);
+  m.spawnHider(-22.0, -16.0);
   m.spawnHider(-12.0, -10.0);
   m.spawnHider(-20.0, -4.0);
   m.spawnHider(-8.0, 2.0);

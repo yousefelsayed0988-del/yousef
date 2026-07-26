@@ -355,14 +355,14 @@ export function build() {
   // ------------------------------------------------------------------ spawns --
   m.spawnHider(-20, -17, WY);
   m.spawnHider(20, -17, WY);
-  m.spawnHider(-16.5, 17, WY);
+  m.spawnHider(-16.0, 17.5, WY);
   m.spawnHider(20, 17, WY);
   m.spawnHider(0, -16.5 + 3.6, 0);
   m.spawnHider(0, 16.5 - 3.6, 0);
   m.spawnHider(-7.4, -12, WY);
   m.spawnHider(7.4, 12, WY);
   m.spawnHider(0, 0, 0);
-  m.spawnHider(-3.5, 5.6, 0);
+  m.spawnHider(-2.4, 5.6, 0);
   m.spawnHider(11, -4.6, WY);
   m.spawnHider(-11, 4.6, WY);
   m.spawnSeeker(-25.5, -4.6, WY);

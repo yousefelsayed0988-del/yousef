@@ -4,6 +4,7 @@
 
 import * as arcade from './map_arcade.js';
 import * as backrooms from './map_backrooms.js';
+import * as coldstorage from './map_coldstorage.js';
 import * as country from './map_country.js';
 import * as egypt from './map_egypt.js';
 import * as gallery from './map_gallery.js';
@@ -21,7 +22,7 @@ import * as toyroom from './map_toyroom.js';
 import * as viking from './map_viking.js';
 
 const MODULES = [
-  arcade, backrooms, country, egypt, gallery, greenhouse, mansion, museum, osaka, penguin, pool, sewer, subway, sugarland, supermarket, toyroom, viking,
+  arcade, backrooms, coldstorage, country, egypt, gallery, greenhouse, mansion, museum, osaka, penguin, pool, sewer, subway, sugarland, supermarket, toyroom, viking,
 ];
 
 export const MAP_LIST = MODULES.map((mod) => ({

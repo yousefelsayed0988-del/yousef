@@ -219,7 +219,11 @@ async function main() {
       const blend = await host.evaluate(() => document.getElementById('paintBlendFill').style.width);
       if (blend && blend !== '0%') pass('painting updates the blend meter', blend);
       else fail('painting updates the blend meter', `width=${blend}`);
-      await host.click('#paintClose');
+      // Prep can end while we are in here, which closes the screen for us.
+      const stillOpen = await host.evaluate(() =>
+        !document.getElementById('paintScreen').classList.contains('hidden'));
+      if (stillOpen) await host.click('#paintClose').catch(() => {});
+      else console.log(`        (paint screen already closed; phase is ${await hudPhase(host)})`);
     } else {
       // The host may have drawn hunter; that is legitimate, not a failure.
       pass('prep phase reached (host drew hunter, paint screen not applicable)', role);

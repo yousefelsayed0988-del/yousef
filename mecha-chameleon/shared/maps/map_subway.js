@@ -376,11 +376,11 @@ export function build() {
   m.spawnHider(-14, TR_S, 0);
   m.spawnHider(8, TR_S, 0);
   m.spawnHider(-27.2, -1.6, PLAT_Y);
-  m.spawnSeeker(26.8, 0, PLAT_Y);
-  m.spawnSeeker(28.6, 1.8, PLAT_Y);
-  m.spawnSeeker(28.6, -1.8, PLAT_Y);
-  m.spawnSeeker(30.2, 0, PLAT_Y);
-  m.lobbySpawn(28, 0, PLAT_Y);
+  m.spawnSeeker(23.5, -3.5, PLAT_Y);
+  m.spawnSeeker(22.0, -5.0, PLAT_Y);
+  m.spawnSeeker(24.6, -5.4, PLAT_Y);
+  m.spawnSeeker(22.4, -2.4, PLAT_Y);
+  m.lobbySpawn(23.0, -4.0, PLAT_Y);
 
   m.palette([CREAM, CREAM_DK, TEAL, TEAL_DK, CONCRETE, CONCRETE_DK, STEEL, RUST,
     TRAIN, ACCENT, SEAT, AMBER, DARK, GLASS]);

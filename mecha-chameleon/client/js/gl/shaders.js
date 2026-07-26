@@ -131,8 +131,10 @@ void main() {
   vec3 diffuse = albedo * (1.0 - metal);
 
   // Hemispheric ambient: sky above, a bounced tint of the surface below.
+  // Linear in uAmbient on purpose - squaring it (which is easy to do by
+  // accident here) turns a deliberately dim map into a black one.
   float up = n.y * 0.5 + 0.5;
-  vec3 ambient = mix(uAmbient * 0.65, uSkyColor * 0.9, up) * uAmbient * 2.0;
+  vec3 ambient = mix(uAmbient * 0.8, uSkyColor * 0.6 + uAmbient * 0.7, up);
   vec3 color = diffuse * ambient;
 
   // Sun

@@ -258,7 +258,7 @@ export function build() {
   }
 
   // ---------------------------------------------------------------- spawns --
-  m.spawnHider(2, -13); m.spawnHider(3.4, -17); m.spawnHider(-16, -6.2);
+  m.spawnHider(2, -13); m.spawnHider(3.6, -16.4); m.spawnHider(-16, -6.2);
   m.spawnHider(-4, -6.2); m.spawnHider(-14, 6.2); m.spawnHider(0, 3.5);
   m.spawnHider(9, -3.5); m.spawnHider(17, 6.2); m.spawnHider(25, -6.2);
   m.spawnHider(29, 2.5); m.spawnHider(-29, 3.0); m.spawnHider(-9, -3.0);

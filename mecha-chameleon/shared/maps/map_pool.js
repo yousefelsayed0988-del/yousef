@@ -144,8 +144,8 @@ export function build() {
   }
   m.box(18.0, DIVE3 - 0.2, 0, 5.2, 0.2, 4.4, CONC, { tag: 'diveDeck3' });
   m.box(16.2, DIVE5 - 0.2, 0, 3.4, 0.2, 3.0, CONC, { tag: 'diveDeck5' });
-  m.stairs(25.0, 0, 1.8, 11, 0.3, 0.4, CONC, { yaw: -90, y: DECK });
-  m.stairs(20.6, 0, 1.4, 7, 2 / 7, 0.4, CONC, { yaw: -90, y: DIVE3 });
+  m.stairs(25.0, 0, 1.8, 11, 0.3, 0.4, CONC_DK, { yaw: -90, y: DECK });
+  m.stairs(20.6, 0, 1.4, 7, 2 / 7, 0.4, CONC_DK, { yaw: -90, y: DIVE3 });
   // Boards reaching out over the deep end.
   m.box(12.4, DIVE3 - 0.12, 0, 6.4, 0.12, 0.72, TILE, { tag: 'board3' });
   m.box(12.2, DIVE5 - 0.12, 0, 5.0, 0.12, 1.7, TILE, { tag: 'platform5' });
@@ -157,7 +157,7 @@ export function build() {
     [17.75, 0, 0.1, 2.8, DIVE5]]) {
     m.box(rx, ry, rz, rw, 1.05, rd, STEEL, { opaque: false, tag: 'diveRail' });
   }
-  m.box(14.4, DECK, -5.4, 1.0, 0.95, 1.0, CONC, { tag: 'springStand' });
+  m.box(14.4, DECK, -5.4, 1.0, 0.95, 1.0, CONC_DK, { tag: 'springStand' });
   m.box(12.6, DECK + 0.95, -5.4, 4.4, 0.1, 0.62, TILE, { tag: 'springboard' });
   m.box(14.9, DECK + 0.95, -5.4, 0.5, 0.3, 0.7, STEEL, { solid: false, tag: 'fulcrum' });
 
@@ -338,7 +338,7 @@ export function build() {
   // ------------------------------------------------------------------ spawns --
   m.spawnHider(-21.5, -11.0, DECK);
   m.spawnHider(-20.5, 2.0, DECK);
-  m.spawnHider(-20.0, 13.5, DECK);
+  m.spawnHider(-21.3, 13.5, DECK);
   m.spawnHider(-10.0, -11.0, DECK);
   m.spawnHider(2.0, -11.4, DECK);
   m.spawnHider(11.0, 11.0, DECK);
@@ -350,7 +350,7 @@ export function build() {
   m.spawnHider(19.4, 1.5, DIVE3);
   m.spawnSeeker(-24.0, -3.0, DECK);
   m.spawnSeeker(-24.0, -6.5, DECK);
-  m.spawnSeeker(-24.6, 0.5, DECK);
+  m.spawnSeeker(-23.0, 2.0, DECK);
   m.spawnSeeker(-21.6, -4.8, DECK);
   m.lobbySpawn(-23.4, -3.6, DECK);
 

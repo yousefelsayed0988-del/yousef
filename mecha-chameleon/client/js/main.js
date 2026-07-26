@@ -96,6 +96,7 @@ let lastFrame = performance.now() / 1000;
 let fpsAccum = 0, fpsFrames = 0, fps = 0;
 let previewMode = false;
 let greeted = false;
+let lastRender = 0;
 
 // ---------------------------------------------------------------- helpers --
 function setMap(mapId) {
@@ -642,7 +643,15 @@ function frame() {
   animT += dt;
 
   step(dt);
-  if (game.world) render(dt);
+  // The menu and lobby only show a still scene behind the panels, so there is
+  // no reason to redraw them at full rate - it burns a laptop battery for
+  // nothing, and on a shared machine it starves whatever else is running.
+  const idleScreen = ui.screen !== 'play' && !previewMode;
+  const renderDue = !idleScreen || now - lastRender > 0.05;
+  if (game.world && renderDue) {
+    lastRender = now;
+    render(dt);
+  }
 
   hud.update({
     phase: game.phase,
