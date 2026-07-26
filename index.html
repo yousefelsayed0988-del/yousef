@@ -3790,6 +3790,27 @@ function program(vs, fs){
 }
 
 /* ---------------- meshes ---------------- */
+/* Every VAO and buffer this function hands out, so that rebuilding the level
+   can give them back. The old code cleared WORLD.statics and friends by
+   assigning fresh arrays under a comment that said "dispose old GPU meshes",
+   which disposes of the JavaScript references and nothing else - the driver
+   allocations stayed. A house is around 350 meshes, so sixty retries in a
+   session orphaned twenty thousand VAOs and a couple of hundred megabytes of
+   vertex data that nothing would ever free. Adding joinery made every wall
+   face thirteen quads instead of one, which made it a great deal worse. */
+const MESHPOOL = [];
+let MESH_OWNER = 'world';                 // 'world' rebuilds per level, 'lodger' per quality change
+function freeMeshes(owner){
+  for (let i = MESHPOOL.length - 1; i >= 0; i--){
+    const m = MESHPOOL[i];
+    if (m.owner !== owner) continue;
+    if (m.vao) gl.deleteVertexArray(m.vao);
+    if (m.vb) gl.deleteBuffer(m.vb);
+    if (m.ib) gl.deleteBuffer(m.ib);
+    MESHPOOL.splice(i, 1);
+  }
+}
+
 function makeMesh(data){
   const vao = gl.createVertexArray();
   gl.bindVertexArray(vao);
@@ -3805,7 +3826,9 @@ function makeMesh(data){
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
   gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, data.indices, gl.STATIC_DRAW);
   gl.bindVertexArray(null);
-  return { vao, count: data.indices.length };
+  const m = { vao, vb, ib, count: data.indices.length, owner: MESH_OWNER };
+  MESHPOOL.push(m);
+  return m;
 }
 function drawMesh(m){ gl.bindVertexArray(m.vao); gl.drawElements(gl.TRIANGLES, m.count, gl.UNSIGNED_INT, 0); }
 
@@ -5312,6 +5335,19 @@ function uploadTex(source, repeat, mips){
 }
 
 /* ---------------- render targets ---------------- */
+/* Dragging a window edge fires resize once a frame. Each call used to build a
+   fresh scene target and four bloom targets and simply drop the old ones on
+   the floor - at 2560x1440 on Ultra that is a hundred megabytes of colour and
+   depth per second handed to the driver and never asked for back, until the
+   tab loses its context and the canvas goes black for good. */
+function freeTarget(t){
+  if (!t) return;
+  if (t.fbo) gl.deleteFramebuffer(t.fbo);
+  if (t.col) gl.deleteTexture(t.col);
+  if (t.dep) gl.deleteRenderbuffer(t.dep);
+  if (t.tex) gl.deleteTexture(t.tex);
+}
+
 function makeTarget(w, h, depth){
   const fbo = gl.createFramebuffer();
   gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
@@ -5876,7 +5912,10 @@ function pushTrim(b, side, y0, y1, out, uScale){
 }
 
 function buildWorld(){
-  // dispose old GPU meshes
+  // hand the previous house back to the driver before building the next one.
+  // The Lodger's own meshes are tagged separately - he outlives the level.
+  MESH_OWNER = 'world';
+  freeMeshes('world');
   WORLD.statics = []; WORLD.doors = []; WORLD.props = []; WORLD.lamps = [];
   WORLD.hides = []; WORLD.blockers = []; WORLD.safe = null; WORLD.traps = [];
 
@@ -6660,7 +6699,16 @@ function buildTextures(){
   }
   TEXINFO = { max: maxT, hero: 0, char: 0, world: worldRes, count: 0, budgetMB: Math.round(cost() / 1048576) };
   for (const k in gen){
+    /* Delete the handle AND forget it. Leaving a deleted WebGLTexture in TX
+       keeps it truthy, which defeats the `TX[tex] || TX.concrete` fallback in
+       drawScene: if generation then fails all four retries, every draw that
+       wants this material raises INVALID_OPERATION and renders with whatever
+       was bound last. All four joinery bands in the house go through the one
+       'trimPaint' key, so a single failure there used to strip every
+       skirting, rail and cornice in the building and emit a GL error every
+       frame forever. */
     if (TX[k]) gl.deleteTexture(TX[k]);
+    delete TX[k];
     let res = HERO[k] ? heroRes : (CHAR[k] ? charRes : worldRes);
     /* if the browser refuses a canvas or the GPU refuses the upload, halve
        it and try again rather than taking the whole game down */
@@ -7045,11 +7093,15 @@ buildLodger = function(){
 };
 
 function buildVillain(){
+  // his rig is rebuilt on a quality change, not on a new night
+  freeMeshes('lodger');
+  MESH_OWNER = 'lodger';
   V.bones = buildLodger();
   for (const n in V.bones){
     const b = V.bones[n];
     b.gpu = b.meshes.length ? compileModel(b.meshes) : [];
   }
+  MESH_OWNER = 'world';
 }
 
 /* ---------------- level start ---------------- */
@@ -9163,7 +9215,9 @@ function scanNear(){
   else if (nearSafe) txt = safeOpen ? 'The strongbox is open' : '[E] Strongbox - three numbers';
   else if (nearExit) txt = doorPromptText();
   else if (nearHide) txt = nearHide.kind === 'bed' ? '[E] Hide under the bed' : '[E] Hide in the wardrobe';
-  else if (nearDoor && nearDoor.locked) txt = P.tools.lockpick ? '[E] Pick the padlock' : 'Padlocked - you need picks';
+  else if (nearDoor && nearDoor.locked) txt = P.tools.cellarkey ? '[E] Unlock the padlock'
+                                            : P.tools.lockpick ? '[E] Pick the padlock'
+                                            : 'Padlocked - you need picks or the cellar key';
   else if (nearDoor) txt = nearDoor.open
     ? (doorBlockedByHim(nearDoor) ? 'He is standing in the doorway' : '[E] Close door')
     : '[E] Open door';
@@ -9225,7 +9279,11 @@ function interact(){
   if (nearHide){ enterHide(nearHide); return; }
   if (nearDoor){
     if (nearDoor.locked){
-      if (P.tools.lockpick){
+      if (P.tools.cellarkey){
+        nearDoor.locked = false;
+        SFX.clunk();
+        subtitle('The cellar key turns it first time, the way it was always going to.');
+      } else if (P.tools.lockpick){
         nearDoor.locked = false;
         SFX.pick(); SFX.clunk();
         subtitle('Two minutes with a pick and the padlock drops on the boards.');
@@ -9770,14 +9828,19 @@ function resize(){
   canvas.style.height = window.innerHeight + 'px';
   if (RW === w && RH === h && sceneRT) return;
   RW = w; RH = h;
+  freeTarget(sceneRT); freeTarget(bloomA); freeTarget(bloomB);
+  freeTarget(bloomC); freeTarget(bloomD);
   sceneRT = makeTarget(w, h, true);
   bloomA = makeTarget(Math.max(2, w>>2), Math.max(2, h>>2), false);
   bloomB = makeTarget(Math.max(2, w>>2), Math.max(2, h>>2), false);
   bloomC = makeTarget(Math.max(2, w>>4), Math.max(2, h>>4), false);
   bloomD = makeTarget(Math.max(2, w>>4), Math.max(2, h>>4), false);
   const ss = shadowSize();
-  if (ss && (!shadowRT || shadowRT.size !== ss)) shadowRT = makeShadowTarget(ss);
-  if (!ss) shadowRT = null;
+  if (ss && (!shadowRT || shadowRT.size !== ss)){
+    freeTarget(shadowRT);
+    shadowRT = makeShadowTarget(ss);
+  }
+  if (!ss){ freeTarget(shadowRT); shadowRT = null; }
 }
 window.addEventListener('resize', resize);
 

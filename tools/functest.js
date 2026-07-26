@@ -365,6 +365,37 @@ const server = http.createServer((req, res) => {
       if (items.filter(i => i.live && i.type === 'boxSet').length) errs.push('a broken music box leaves its model behind');
     }
 
+    // 10g. GPU resources must be handed back. A player who dies and retries
+    //      sixty times in a session used to orphan twenty thousand VAOs.
+    {
+      resume();
+      const g = document.getElementById('scene').getContext('webgl2');
+      const count = { vao: 0, buf: 0, vaoDel: 0, bufDel: 0, fb: 0, tex: 0, fbDel: 0, texDel: 0 };
+      const wrap = (obj, name, key) => { const f = obj[name].bind(obj); obj[name] = function () { count[key]++; return f.apply(obj, arguments); }; return f; };
+      const orig = {
+        cva: wrap(g, 'createVertexArray', 'vao'), cb: wrap(g, 'createBuffer', 'buf'),
+        dva: wrap(g, 'deleteVertexArray', 'vaoDel'), db: wrap(g, 'deleteBuffer', 'bufDel'),
+        cf: wrap(g, 'createFramebuffer', 'fb'), ct: wrap(g, 'createTexture', 'tex'),
+        df: wrap(g, 'deleteFramebuffer', 'fbDel'), dt: wrap(g, 'deleteTexture', 'texDel'),
+      };
+      for (let i = 0; i < 3; i++) { try { startGame(); } catch (e) { errs.push('restart ' + i + ': ' + e.message); break; } }
+      // and drive resize through several distinct sizes
+      const rw = RW;
+      for (let i = 0; i < 6; i++) { RW = rw + i * 37; RH = 200 + i * 11; try { resize(); } catch (e) { errs.push('resize: ' + e.message); break; } }
+      g.createVertexArray = orig.cva; g.createBuffer = orig.cb;
+      g.deleteVertexArray = orig.dva; g.deleteBuffer = orig.db;
+      g.createFramebuffer = orig.cf; g.createTexture = orig.ct;
+      g.deleteFramebuffer = orig.df; g.deleteTexture = orig.dt;
+      log.push('gpu over 3 restarts + 6 resizes: vao ' + count.vao + ' created / ' + count.vaoDel +
+               ' freed, buffers ' + count.buf + ' / ' + count.bufDel +
+               ', framebuffers ' + count.fb + ' / ' + count.fbDel);
+      // two rebuilds worth of world meshes should come back; allow the first
+      // build (nothing to free yet) and the Lodger's own rig to stay live
+      if (count.vaoDel < count.vao * 0.55) errs.push('vertex arrays are leaking on level rebuild: ' + count.vao + ' created, only ' + count.vaoDel + ' freed');
+      if (count.fbDel < count.fb * 0.55) errs.push('framebuffers are leaking on resize: ' + count.fb + ' created, only ' + count.fbDel + ' freed');
+      resume();
+    }
+
     // 11. a long soak with the villain hunting
     V.state = 'hunt'; V.lastSeen = { x: Math.floor(P.x), y: Math.floor(P.z) };
     P.alive = true;
