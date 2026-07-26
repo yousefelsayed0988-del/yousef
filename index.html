@@ -5333,6 +5333,35 @@ function makeTarget(w, h, depth){
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   return { fbo, col, dep, w, h };
 }
+/* A 1x1 stand-in for the shadow map.
+
+   FS_MAIN declares uShadow as a sampler2DShadow. A shadow sampler pointed at
+   a texture that is not a depth texture with compare mode on is INCOMPLETE,
+   and an incomplete sampler takes the whole draw call down with it - the
+   frame comes back black, every surface, not just the shadowed ones. The
+   old code only bound the real map when it was actually casting, which meant
+   the no-shadow path (quality Low, or simply switching the torch off) was
+   sampling whatever happened to be left on texture unit 1. Nobody noticed
+   because with the torch off there is almost nothing lit to lose.
+
+   So there is always something valid on that unit now. uShadowOn still gates
+   the maths; this only keeps the sampler complete. */
+let nullShadowTex = null;
+function nullShadow(){
+  if (nullShadowTex) return nullShadowTex;
+  const t = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT24, 1, 1, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_COMPARE_MODE, gl.COMPARE_REF_TO_TEXTURE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_COMPARE_FUNC, gl.LEQUAL);
+  nullShadowTex = t;
+  return t;
+}
+
 function makeShadowTarget(size){
   const fbo = gl.createFramebuffer();
   gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
@@ -9614,7 +9643,14 @@ function initGfx(){
   resize();
 }
 
-function shadowSize(){ return [0, 512, 1024, 2048][S.q] || 1024; }
+/* The `|| 1024` on the old one-liner defeated both ends of the table: Low
+   asked for no shadow map at all and got a full 1024, and Ultra 4K ran off
+   the end of the array and got 1024 instead of the 2048 it is paying for. */
+const SHADOW_SIZE = [0, 512, 1024, 2048, 2048];
+function shadowSize(){
+  const s = SHADOW_SIZE[S.q];
+  return s === undefined ? 1024 : s;
+}
 
 function resize(){
   const q = Q();
@@ -9878,10 +9914,9 @@ function renderFrame(dt){
   }
   gl.uniform1i(m.u.uTex, 0);
   gl.uniform1i(m.u.uShadow, 1);
-  if (useShadow){
-    gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, shadowRT.tex);
-  }
+  gl.activeTexture(gl.TEXTURE1);
+  gl.bindTexture(gl.TEXTURE_2D, useShadow ? shadowRT.tex : nullShadow());
+  gl.activeTexture(gl.TEXTURE0);
 
   /* Six point lights, filled nearest-first: anything you have set burning
      goes in before the ceiling bulbs, because a road flare on the boards at
