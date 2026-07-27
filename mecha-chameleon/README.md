@@ -160,7 +160,8 @@ server/     ws.js (RFC6455 from scratch) · index.js · rooms.js · match.js
 client/     index.html · css/ · js/gl (WebGL2 instanced renderer)
             main.js · net.js · input.js · ui.js · hud.js · paintui.js
             chameleon.js · audio.js
-tools/      validate-maps.js · e2e.js · test-sim.js
+tools/      validate-maps.js · test-anticheat.js · test-sim.js
+            test-play.js · e2e.js · model-shot.js
 ```
 
 `ARCHITECTURE.md` documents every module contract.
