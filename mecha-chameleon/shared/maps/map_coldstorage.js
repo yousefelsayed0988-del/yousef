@@ -191,7 +191,10 @@ export function build() {
     }
     m.box(x - Math.sin(a) * 0.78, 0.4, z + Math.cos(a) * 0.78, 2.2, 1.3, 0.1, SHADOW,
       { yaw, solid: false, tag: 'grille' });
-    m.pipe(x, 2.6, z, x, z + 3.2, 0.1, FROST_DK, { solid: false });
+    // The suction line leaves through the back of the unit, so it has to
+    // follow the yaw - on the south-wall condenser a fixed +z run would push
+    // it out through the shell.
+    m.pipe(x, 2.6, z, x, z + Math.cos(a) * 3.2, 0.1, FROST_DK, { solid: false });
   };
   condenser(-22, -18.0, 0);
   condenser(-15, -18.0, 0);

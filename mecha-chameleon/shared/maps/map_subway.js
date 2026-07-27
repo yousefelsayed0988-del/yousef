@@ -43,6 +43,9 @@ export function build() {
   const GLASS = '#b6cfd6';
 
   const PLAT_Y = 1.0;
+  // Ballast top. Trench-level spawns and spots stand on it, not on the slab
+  // underneath, so they have to declare this height and not zero.
+  const BALLAST_Y = 0.18;
   const PLAT_X0 = -29, PLAT_X1 = 19;
   const TR_N = -7.7, TR_S = 7.7;      // track centrelines
   const CAR_Z = -7.0;                 // the stopped carriage sits off-centre,
@@ -98,14 +101,14 @@ export function build() {
     m.box(-30.8, 0, tz, 2.4, 3.6, 3.9, '#0b0d10', { solid: false, tag: 'tunnelDark' });
     m.box(-29.4, 3.6, tz, 0.8, 0.5, 4.2, RUST, { solid: false, jitter: 0.1, tag: 'portalArch' });
   }
-  m.spot(-30.6, 0, TR_N, { stance: 'stand', quality: 0.88, hint: 'Inside the north tunnel mouth' });
-  m.spot(-30.6, 0, TR_S, { stance: 'stand', quality: 0.86, hint: 'Inside the south tunnel mouth' });
+  m.spot(-30.6, BALLAST_Y, TR_N, { stance: 'stand', quality: 0.88, hint: 'Inside the north tunnel mouth' });
+  m.spot(-30.6, BALLAST_Y, TR_S, { stance: 'stand', quality: 0.86, hint: 'Inside the south tunnel mouth' });
 
   // --------------------------------------------------------------- trackwork --
   for (const tz of [TR_N, TR_S]) {
-    m.box(-6.4, 0, tz, 49.2, 0.18, 4.2, '#4b4741', { tag: 'ballast', jitter: 0.06 });
+    m.box(-6.4, 0, tz, 49.2, BALLAST_Y, 4.2, '#4b4741', { tag: 'ballast', jitter: 0.06 });
     for (const s of [-1, 1]) {
-      m.box(-6.4, 0.18, tz + s * 0.72, 49.2, 0.14, 0.12, STEEL, { tag: 'rail', metal: 0.7, rough: 0.35 });
+      m.box(-6.4, BALLAST_Y, tz + s * 0.72, 49.2, 0.14, 0.12, STEEL, { tag: 'rail', metal: 0.7, rough: 0.35 });
     }
     for (let i = 0; i < 21; i++) {
       m.box(-30.5 + i * 2.4, 0.16, tz, 0.24, 0.12, 2.1, '#3b332a',
@@ -115,7 +118,7 @@ export function build() {
     m.box(18.4, 0.2, tz, 0.5, 1.1, 2.4, RUST, { tag: 'bufferStop', jitter: 0.08 });
     m.box(18.4, 1.3, tz, 0.6, 0.3, 2.6, AMBER, { solid: false });
   }
-  m.spot(17.2, 0, TR_S, { stance: 'crouch', quality: 0.8, hint: 'Behind the south buffer stop' });
+  m.spot(17.2, BALLAST_Y, TR_S, { stance: 'crouch', quality: 0.8, hint: 'Behind the south buffer stop' });
   // Signals and cable trays.
   for (const [sx, sz] of [[-18, TR_N], [4, TR_S]]) {
     m.cyl(sx, 0.2, sz + 1.85, 0.09, 2.4, CONCRETE_DK, { tag: 'signalPost' });
@@ -143,7 +146,7 @@ export function build() {
   m.spot(-24, 0, -5.25, { stance: 'prone', quality: 0.86, hint: 'Under the platform lip, north side' });
   m.spot(-8, 0, 5.25, { stance: 'prone', quality: 0.86, hint: 'Under the platform lip, south side' });
   m.spot(9, 0, 5.25, { stance: 'prone', quality: 0.82, hint: 'Flat in the south trench' });
-  m.spot(-25, 0, -9.6, { stance: 'crouch', quality: 0.78, hint: 'In the north trench, past the train' });
+  m.spot(-25, BALLAST_Y, -9.6, { stance: 'crouch', quality: 0.78, hint: 'In the north trench, past the train' });
 
   // ---------------------------------------------------------------- carriage --
   const CX0 = -14, CX1 = 12;
@@ -330,14 +333,16 @@ export function build() {
 
   // --------------------------------------------------------------- mezzanine --
   m.stairs(26.5, -2.6, 3.4, 12, 3.4 / 12, 0.5, CONCRETE, { yaw: 0, y: PLAT_Y });
-  m.box(26.5, 4.0, 7.45, 8.0, 0.4, 7.9, CONCRETE, { tag: 'mezzDeck' });
-  for (const [bx, bz, bw, bd] of [[22.6, 7.45, 0.2, 7.9], [23.5, 3.55, 2.2, 0.2], [29.5, 3.55, 2.2, 0.2]]) {
+  // The deck stops at the face of the tiled hall wall (z = 10.45); running it
+  // further would bury it in the wall and push it past the level bounds.
+  m.box(26.5, 4.0, 6.95, 8.0, 0.4, 6.9, CONCRETE, { tag: 'mezzDeck' });
+  for (const [bx, bz, bw, bd] of [[22.6, 6.95, 0.2, 6.9], [23.5, 3.55, 2.2, 0.2], [29.5, 3.55, 2.2, 0.2]]) {
     m.box(bx, 4.4, bz, bw, 1.0, bd, STEEL, { opaque: false, tag: 'balustrade' });
     m.box(bx, 5.4, bz, bw + 0.1, 0.08, bd + 0.1, CONCRETE_DK, { solid: false, tag: 'handrail' });
   }
-  m.box(28.6, 4.4, 9.6, 3.4, 2.2, 2.2, CREAM_DK, { tag: 'mezzOffice' });
-  m.box(26.85, 4.9, 9.6, 0.1, 1.1, 1.6, GLASS, { opaque: false, rough: 0.1, tag: 'officeGlass' });
-  m.box(28.6, 6.6, 9.6, 3.5, 0.12, 2.3, CONCRETE_DK, { solid: false });
+  m.box(28.6, 4.4, 9.3, 3.4, 2.2, 2.2, CREAM_DK, { tag: 'mezzOffice' });
+  m.box(26.85, 4.9, 9.3, 0.1, 1.1, 1.6, GLASS, { opaque: false, rough: 0.1, tag: 'officeGlass' });
+  m.box(28.6, 6.6, 9.3, 3.5, 0.12, 2.3, CONCRETE_DK, { solid: false });
   vending(23.6, 9.8, 180, SEAT);
   vending(24.8, 9.8, 180, ACCENT);
   bench(25.6, 5.4, 0);
@@ -372,9 +377,9 @@ export function build() {
   m.spawnHider(15, -1.6, PLAT_Y);
   m.spawnHider(-8, CAR_Z, CAR_FLOOR);
   m.spawnHider(6, CAR_Z, CAR_FLOOR);
-  m.spawnHider(-24, -9.6, 0);
-  m.spawnHider(-14, TR_S, 0);
-  m.spawnHider(8, TR_S, 0);
+  m.spawnHider(-24, -9.6, BALLAST_Y);
+  m.spawnHider(-14, TR_S, BALLAST_Y);
+  m.spawnHider(8, TR_S, BALLAST_Y);
   m.spawnHider(-27.2, -1.6, PLAT_Y);
   m.spawnSeeker(23.5, -3.5, PLAT_Y);
   m.spawnSeeker(22.0, -5.0, PLAT_Y);

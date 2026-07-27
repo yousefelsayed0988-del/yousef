@@ -245,7 +245,8 @@ export function build() {
   plinth(5.6, 0, 6.4, 1.0, 1.0);
   plinth(-5.6, 0, -3.0, 0.9, 1.15);
   plinth(5.6, 0, -3.0, 0.9, 1.15);
-  plinth(-20.0, 15.0, 0, 0.9, 1.1);
+  // Lobby, in the bare band between the door wall and the coat check.
+  plinth(-20.0, 0, 15.0, 0.9, 1.1);
 
   // The centrepiece: a big drum with a leaning slab and a hollow you can duck in.
   m.cyl(0, 0, 1.6, 2.3, 0.55, STONE, { tag: 'daisPlinth' });

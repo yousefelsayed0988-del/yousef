@@ -65,31 +65,14 @@ try {
   await waitFor(async () => (await phase()) === 2, { label: 'prep phase', timeout: 60000 });
   pass('reached the prep phase');
 
-  // Close the paint screen if it opened for us, then walk.
+  // Close the paint screen if it opened for us.
   await page.evaluate(() => {
     const s = document.getElementById('paintScreen');
     if (s && !s.classList.contains('hidden')) document.getElementById('paintClose').click();
   });
   await sleep(400);
-
-  const before = await page.evaluate(() => window.__mcDebug.pos());
-  await page.keyboard.down('KeyW');
-  await sleep(2000);
-  await page.keyboard.up('KeyW');
-  await sleep(600);
-  const after = await page.evaluate(() => window.__mcDebug.pos());
-  const dist = Math.hypot(after.x - before.x, after.z - before.z);
-  if (dist > 1.5) pass('walking moves the player', `${dist.toFixed(1)}m in 2s`);
-  else fail('walking moves the player', `${dist.toFixed(2)}m`);
-
-  // At rest the predicted position must stop moving. A steady drift here is
-  // prediction and authority disagreeing, which a player feels as rubber-band.
-  const rest1 = await page.evaluate(() => window.__mcDebug.pos());
-  await sleep(1200);
-  const rest2 = await page.evaluate(() => window.__mcDebug.pos());
-  const drift = Math.hypot(rest2.x - rest1.x, rest2.z - rest1.z);
-  if (drift < 0.35) pass('prediction settles at rest', `${drift.toFixed(3)}m over 1.2s`);
-  else fail('prediction settles at rest', `${drift.toFixed(2)}m drift`);
+  const role = await page.evaluate(() => window.__mcDebug.game.me.role);
+  pass('a role was drawn', role === 1 ? 'hider' : role === 2 ? 'hunter' : `role ${role}`);
 
   // Painting from the map's own palette must move the camouflage score.
   const blend = await page.evaluate(async () => {
@@ -108,6 +91,48 @@ try {
 
   await waitFor(async () => (await phase()) === 3, { label: 'hunt phase', timeout: 90000 });
   pass('the hunt begins');
+
+  // Movement is tested here rather than during prep: hunters are deliberately
+  // frozen until the release, so a prep-phase walk test passes or fails on the
+  // role the round happened to draw.
+  await waitFor(async () => await page.evaluate(() => window.__mcDebug.game.released),
+    { label: 'hunters released', timeout: 20000 });
+  // Face whichever way is actually open before walking - spawns point in a
+  // random direction, and "did not move" against a wall proves nothing.
+  const heading = await page.evaluate(async () => {
+    const { raycast } = await import('/shared/collision.js');
+    const g = window.__mcDebug.game;
+    const eye = { x: g.me.pos.x, y: g.me.pos.y + 1.0, z: g.me.pos.z };
+    let bestYaw = 0, bestClear = -1;
+    for (let i = 0; i < 16; i++) {
+      const yaw = (i / 16) * Math.PI * 2;
+      const dir = { x: -Math.sin(yaw), y: 0, z: -Math.cos(yaw) };
+      const hit = raycast(g.world, eye, dir, 12, {});
+      const clear = hit.hit ? hit.t : 12;
+      if (clear > bestClear) { bestClear = clear; bestYaw = yaw; }
+    }
+    g.input.setAngles(bestYaw, 0);
+    return { yaw: bestYaw, clear: bestClear };
+  });
+
+  const before = await page.evaluate(() => window.__mcDebug.pos());
+  await page.keyboard.down('KeyW');
+  await sleep(2000);
+  await page.keyboard.up('KeyW');
+  await sleep(600);
+  const after = await page.evaluate(() => window.__mcDebug.pos());
+  const dist = Math.hypot(after.x - before.x, after.z - before.z);
+  if (dist > 1.5) pass('walking moves the player', `${dist.toFixed(1)}m in 2s`);
+  else fail('walking moves the player', `${dist.toFixed(2)}m with ${heading.clear.toFixed(1)}m of clearance ahead`);
+
+  // At rest the predicted position must stop moving. A steady drift here is
+  // prediction and authority disagreeing, which a player feels as rubber-band.
+  const rest1 = await page.evaluate(() => window.__mcDebug.pos());
+  await sleep(1200);
+  const rest2 = await page.evaluate(() => window.__mcDebug.pos());
+  const drift = Math.hypot(rest2.x - rest1.x, rest2.z - rest1.z);
+  if (drift < 0.35) pass('prediction settles at rest', `${drift.toFixed(3)}m over 1.2s`);
+  else fail('prediction settles at rest', `${drift.toFixed(2)}m drift`);
 
   // Somebody has to become visible during the round. If the visibility filter
   // were inverted, a player would never receive anyone at all.

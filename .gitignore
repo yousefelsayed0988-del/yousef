@@ -8,3 +8,6 @@ shots/
 # scratch harnesses written by review agents
 _probe*.js
 _run_*.js
+
+# runtime state written by the game server
+mecha-chameleon/data/

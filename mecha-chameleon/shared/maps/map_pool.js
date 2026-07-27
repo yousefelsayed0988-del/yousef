@@ -283,6 +283,9 @@ export function build() {
     m.cyl(bx, DECK, bz, 0.32, 0.9, AQUA_DK, { tag: 'bin' });
     m.cyl(bx, DECK + 0.9, bz, 0.35, 0.08, STEEL, { solid: false });
   }
+  // The south-east deck is the map's one genuinely bare quarter. A bench back
+  // is all the cover there is, and the quality says so.
+  m.spot(15, DECK, 11.3, { stance: 'prone', quality: 0.54, hint: 'Flat behind the bench on the open south-east deck' });
 
   // ------------------------------------------------------------- wall detail --
   for (const [wx, wz, ww, wd] of [[0, -19.8, 52, 0.25], [0, 19.8, 52, 0.25], [-25.8, 0, 0.25, 40], [25.8, 0, 0.25, 40]]) {
@@ -336,21 +339,23 @@ export function build() {
   m.light(-23, 3.2, 12, '#e8f4f8', 0.5, 12);
 
   // ------------------------------------------------------------------ spawns --
-  m.spawnHider(-21.5, -11.0, DECK);
-  m.spawnHider(-20.5, 2.0, DECK);
+  m.spawnHider(-17.5, -11.5, DECK);
+  m.spawnHider(-17.0, 3.5, DECK);
   m.spawnHider(-21.3, 13.5, DECK);
   m.spawnHider(-10.0, -11.0, DECK);
   m.spawnHider(2.0, -11.4, DECK);
   m.spawnHider(11.0, 11.0, DECK);
-  m.spawnHider(-6.0, 0.55, 0);
+  // In-basin spawns sit on the stepped floor, not at world zero: the mid
+  // section tops out at 0.3 and the shallow end at 0.55.
+  m.spawnHider(-3.0, -2.0, 0.3);
   m.spawnHider(6.5, 0, 0);
-  m.spawnHider(-11.5, 4.5, 0.55);
+  m.spawnHider(-9.5, 5.5, 0.55);
   m.spawnHider(17.8, -4.6, DECK);
   m.spawnHider(23.0, 8.0, DECK);
   m.spawnHider(19.4, 1.5, DIVE3);
   m.spawnSeeker(-24.0, -3.0, DECK);
   m.spawnSeeker(-24.0, -6.5, DECK);
-  m.spawnSeeker(-23.0, 2.0, DECK);
+  m.spawnSeeker(-23.4, -2.2, DECK);
   m.spawnSeeker(-21.6, -4.8, DECK);
   m.lobbySpawn(-23.4, -3.6, DECK);
 
