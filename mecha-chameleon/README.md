@@ -176,10 +176,13 @@ patterns and poses cost nothing extra. All audio is synthesised at runtime.
 
 ```bash
 node server/index.js --verbose     # server with connection logging
-node tools/validate-maps.js        # map schema + physics
-node tools/test-sim.js             # headless match simulation
-node tools/e2e.js                  # real browsers, real round
+node tools/validate-maps.js        # map schema + physics, every map
+node tools/test-anticheat.js       # false positives first, then cheats
+node tools/test-sim.js             # headless matches on every map and mode
+node tools/test-play.js            # one browser, one round, actually played
+node tools/e2e.js                  # two browsers: links, invites, chat
 node tools/e2e.js --shots          # ...and screenshot every map
+node tools/model-shot.js           # render the chameleon in every pose
 ```
 
 `?preview=<mapId>` opens any map in an orbiting camera with no server needed —
