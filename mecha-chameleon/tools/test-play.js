@@ -115,15 +115,34 @@ try {
     return { yaw: bestYaw, clear: bestClear };
   });
 
-  const before = await page.evaluate(() => window.__mcDebug.pos());
-  await page.keyboard.down('KeyW');
+  // Time the walk inside the page. Under a software renderer the keyup can
+  // land seconds after the test asked for it, so wall-clock here would make
+  // the resulting speed meaningless.
+  // The key event is dispatched from inside the page rather than through the
+  // driver: it lands on the same window listener a real key does, without
+  // depending on which element the harness happened to leave focused.
+  const before = await page.evaluate(() => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW', bubbles: true }));
+    return { ...window.__mcDebug.pos(), t: performance.now(), held: window.__mcDebug.game.input.isDown('forward') };
+  });
+  if (before.held) pass('the movement key registers');
+  else fail('the movement key registers', 'keydown never reached the input layer');
+
   await sleep(2000);
-  await page.keyboard.up('KeyW');
-  await sleep(600);
-  const after = await page.evaluate(() => window.__mcDebug.pos());
+  const after = await page.evaluate(() => {
+    const p = { ...window.__mcDebug.pos(), t: performance.now() };
+    window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW', bubbles: true }));
+    return p;
+  });
+
   const dist = Math.hypot(after.x - before.x, after.z - before.z);
-  if (dist > 1.5) pass('walking moves the player', `${dist.toFixed(1)}m in 2s`);
-  else fail('walking moves the player', `${dist.toFixed(2)}m with ${heading.clear.toFixed(1)}m of clearance ahead`);
+  const seconds = (after.t - before.t) / 1000;
+  const speed = dist / Math.max(seconds, 0.001);
+  // Walking speed, with room for the sprint multiplier and a slice of banked
+  // input either side. Far above that means the client is out-simulating the
+  // server; near zero means input is not reaching the simulation at all.
+  if (speed > 1.0 && speed < 12) pass('walking moves the player at a sane speed', `${speed.toFixed(1)} m/s over ${seconds.toFixed(1)}s`);
+  else fail('walking moves the player at a sane speed', `${speed.toFixed(1)} m/s (${dist.toFixed(1)}m in ${seconds.toFixed(1)}s), ${heading.clear.toFixed(1)}m clearance ahead`);
 
   // At rest the predicted position must stop moving. A steady drift here is
   // prediction and authority disagreeing, which a player feels as rubber-band.

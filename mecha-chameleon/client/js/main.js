@@ -469,23 +469,29 @@ function step(dt) {
   }
 
   const canMove = game.me.alive && ui.screen === 'play' && !paintUI.open && !hud.chatOpen;
-  const raw = input.sample(dt);
-  if (!canMove) { raw.mx = 0; raw.mz = 0; raw.buttons = 0; }
-  // The pose a hider locks in overrides their stance, so holding a pose does
-  // not fight the crouch key.
-  raw.seq = ++inputSeq;
-  raw.dt = dt;
+  const sample = input.sample(dt);
+  if (!canMove) { sample.mx = 0; sample.mz = 0; sample.buttons = 0; }
 
   if (game.me.alive) {
-    applyInput(game.world, game.me, raw, dt);
-    pendingInputs.push(raw);
-    if (pendingInputs.length > 240) pendingInputs.shift();
-    outbox.push({
-      q: raw.seq, d: Math.round(dt * 1000) / 1000,
-      x: Math.round(raw.mx * 100) / 100, z: Math.round(raw.mz * 100) / 100,
-      y: Math.round(raw.yaw * 1000) / 1000, p: Math.round(raw.pitch * 1000) / 1000,
-      b: raw.buttons,
-    });
+    // A single input may not claim more than MOVE.maxInputDt - the server
+    // refuses it, and rightly. On a machine rendering at 5 fps that would
+    // silently halve the player's walking speed, so a long frame is split into
+    // legal slices instead of being clipped down to one.
+    let remaining = Math.min(dt, MOVE.maxInputDt * 6);
+    while (remaining > 1e-4) {
+      const slice = Math.min(remaining, MOVE.maxInputDt);
+      remaining -= slice;
+      const raw = { ...sample, dt: slice, seq: ++inputSeq };
+      applyInput(game.world, game.me, raw, slice);
+      pendingInputs.push(raw);
+      outbox.push({
+        q: raw.seq, d: Math.round(slice * 1000) / 1000,
+        x: Math.round(raw.mx * 100) / 100, z: Math.round(raw.mz * 100) / 100,
+        y: Math.round(raw.yaw * 1000) / 1000, p: Math.round(raw.pitch * 1000) / 1000,
+        b: raw.buttons,
+      });
+    }
+    while (pendingInputs.length > 240) pendingInputs.shift();
   }
 
   sendAccum += dt;
@@ -637,12 +643,17 @@ function prune(list, now) {
 // ------------------------------------------------------------------ loop --
 function frame() {
   const now = performance.now() / 1000;
-  let dt = now - lastFrame;
+  const elapsed = now - lastFrame;
   lastFrame = now;
-  dt = clamp(dt, 1 / 480, 0.1);
+  // Two different clamps on purpose. The simulation gets the real elapsed time
+  // (bounded, so a backgrounded tab does not bank half a minute of movement)
+  // and slices it into legal inputs itself; animation gets a tighter clamp so
+  // one stutter does not teleport a walk cycle.
+  const simDt = clamp(elapsed, 1 / 480, 0.6);
+  const dt = clamp(elapsed, 1 / 480, 0.1);
   animT += dt;
 
-  step(dt);
+  step(simDt);
   // The menu and lobby only show a still scene behind the panels, so there is
   // no reason to redraw them at full rate - it burns a laptop battery for
   // nothing, and on a shared machine it starves whatever else is running.
